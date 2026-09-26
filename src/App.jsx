@@ -10,7 +10,10 @@ import {
   Clock, 
   ClipboardList,
   Flame,
-  Save
+  Save,
+  Trash2,
+  Trophy,
+  ArrowUpDown
 } from 'lucide-react';
 
 // RenderのバックエンドURLを設定してください
@@ -29,7 +32,7 @@ const formatTime = (ms) => {
   return `${pad(minutes)}:${pad(seconds)}.${pad(hundredths)}`;
 };
 
-// 各走行中車両のリアルタイムタイマー表示
+// リアルタイムタイマー（計測者パネル用）
 const LiveTimer = ({ startTime }) => {
   const timeRef = useRef(null);
 
@@ -59,7 +62,8 @@ const LiveTimer = ({ startTime }) => {
 };
 
 export default function App() {
-  const [role, setRole] = useState(null); // 'viewer', 'A' (スタート), 'B' (ストップ)
+  const [role, setRole] = useState(null); // 'viewer', 'A', 'B'
+  const [viewerSortOrder, setViewerSortOrder] = useState('time'); // 'latest' (新着順) or 'time' (タイム順)
   
   // データステート
   const [entries, setEntries] = useState([]);
@@ -113,6 +117,12 @@ export default function App() {
     socket.emit('cancelRun', runId);
   };
 
+  const handleClearResults = () => {
+    if (window.confirm('計測結果ログをすべて削除します。よろしいですか？')) {
+      socket.emit('clearResults');
+    }
+  };
+
   const handleAddEntry = (e) => {
     e.preventDefault();
     if (!newCarNumber.trim() || !newVehicleName.trim()) return;
@@ -153,6 +163,15 @@ export default function App() {
     document.body.removeChild(link);
   };
 
+  // 閲覧者用：ソート済み結果データ生成
+  const getSortedResults = () => {
+    const list = [...results];
+    if (viewerSortOrder === 'time') {
+      return list.sort((a, b) => a.timeMs - b.timeMs);
+    }
+    return list; // 'latest' (デフォルト)
+  };
+
   // 役割選択画面
   if (!role) {
     return (
@@ -171,7 +190,7 @@ export default function App() {
               onClick={() => setRole('viewer')}
               className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-medium transition flex items-center justify-center gap-2"
             >
-              <Users size={18} /> 閲覧者（結果のみ表示）
+              <Users size={18} /> 閲覧者（結果ログのみ表示）
             </button>
             <button 
               onClick={() => setRole('A')}
@@ -183,7 +202,7 @@ export default function App() {
               onClick={() => setRole('B')}
               className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-200"
             >
-              <Square size={18} /> 計測者B (ストップ/ゴール担当)
+              <Square size={18} /> 計測者B (ストップ担当)
             </button>
           </div>
         </div>
@@ -193,13 +212,15 @@ export default function App() {
 
   // 閲覧者（Viewer）画面
   if (role === 'viewer') {
+    const sortedResults = getSortedResults();
+
     return (
       <div className="min-h-screen bg-slate-50 pb-12">
         <header className="bg-white shadow-sm sticky top-0 z-20">
           <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Clock className="text-blue-600 w-6 h-6" />
-              <h1 className="font-bold text-lg text-slate-800">計測ログ (閲覧専用)</h1>
+              <Trophy className="text-amber-500 w-6 h-6" />
+              <h1 className="font-bold text-lg text-slate-800">リザルトボード (閲覧専用)</h1>
             </div>
             <button onClick={() => setRole(null)} className="text-sm text-slate-500 hover:text-slate-800 underline">
               役割を変更
@@ -208,45 +229,51 @@ export default function App() {
         </header>
 
         <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
-          {/* 現在走行中の車両 */}
-          {activeRuns.length > 0 && (
-            <section className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-amber-800 font-bold flex items-center gap-2 mb-4">
-                <Flame className="text-amber-500" size={20} /> 現在走行中の車両 ({activeRuns.length}台)
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {activeRuns.map(run => (
-                  <div key={run.id} className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm flex items-center justify-between">
-                    <div>
-                      <span className="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">No.{run.carNumber}</span>
-                      <div className="font-bold text-slate-800 mt-1">{run.vehicleName}</div>
-                    </div>
-                    <LiveTimer startTime={run.startTime} />
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
           {/* 計測結果ログ */}
           <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h2 className="font-bold text-slate-700 flex items-center gap-2">
-                <Save size={18} className="text-slate-500" /> 計測結果ログ
-              </h2>
-              <button 
-                onClick={handleExportCSV}
-                disabled={results.length === 0}
-                className="flex items-center gap-2 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg transition disabled:opacity-50 font-medium border border-indigo-100"
-              >
-                <Download size={16} /> CSV出力
-              </button>
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Save size={18} className="text-slate-500" />
+                <h2 className="font-bold text-slate-700">計測結果ログ</h2>
+                <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">{results.length} 件</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* 並び替えスイッチ */}
+                <div className="flex items-center bg-slate-200 p-1 rounded-lg text-xs font-medium">
+                  <button 
+                    onClick={() => setViewerSortOrder('time')}
+                    className={`px-3 py-1 rounded-md transition flex items-center gap-1 ${
+                      viewerSortOrder === 'time' ? 'bg-white shadow text-blue-600 font-bold' : 'text-slate-600'
+                    }`}
+                  >
+                    <Trophy size={14} /> タイム順 (Fastest)
+                  </button>
+                  <button 
+                    onClick={() => setViewerSortOrder('latest')}
+                    className={`px-3 py-1 rounded-md transition flex items-center gap-1 ${
+                      viewerSortOrder === 'latest' ? 'bg-white shadow text-blue-600 font-bold' : 'text-slate-600'
+                    }`}
+                  >
+                    <ArrowUpDown size={14} /> 新着順
+                  </button>
+                </div>
+
+                <button 
+                  onClick={handleExportCSV}
+                  disabled={results.length === 0}
+                  className="flex items-center gap-2 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg transition disabled:opacity-50 font-medium border border-indigo-100"
+                >
+                  <Download size={16} /> CSV
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
+                    {viewerSortOrder === 'time' && <th className="py-3 px-6 text-xs font-semibold text-slate-500 w-16">順位</th>}
                     <th className="py-3 px-6 text-xs font-semibold text-slate-500">時刻</th>
                     <th className="py-3 px-6 text-xs font-semibold text-slate-500">カーNo</th>
                     <th className="py-3 px-6 text-xs font-semibold text-slate-500">車両名</th>
@@ -254,15 +281,20 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {results.length === 0 ? (
+                  {sortedResults.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-12 text-center text-slate-400 text-sm">
+                      <td colSpan={viewerSortOrder === 'time' ? 5 : 4} className="py-12 text-center text-slate-400 text-sm">
                         まだ記録されたタイムはありません
                       </td>
                     </tr>
                   ) : (
-                    results.map(r => (
+                    sortedResults.map((r, index) => (
                       <tr key={r.id} className="hover:bg-slate-50/50 transition">
+                        {viewerSortOrder === 'time' && (
+                          <td className="py-3 px-6 font-bold text-slate-500">
+                            {index === 0 ? <span className="text-amber-500 font-black">🥇 1</span> : index === 1 ? <span className="text-slate-400 font-black">🥈 2</span> : index === 2 ? <span className="text-amber-700 font-black">🥉 3</span> : index + 1}
+                          </td>
+                        )}
                         <td className="py-3 px-6 text-xs text-slate-400">
                           {new Date(r.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}
                         </td>
@@ -320,9 +352,14 @@ export default function App() {
                 className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-medium outline-none focus:border-blue-400"
               >
                 <option value="">-- 発進する車両を選択 --</option>
-                {entries.map(e => (
-                  <option key={e.id} value={e.id}>No.{e.carNumber} - {e.vehicleName}</option>
-                ))}
+                {entries.map(e => {
+                  const isRunning = activeRuns.some(r => r.carId === e.id);
+                  return (
+                    <option key={e.id} value={e.id} disabled={isRunning}>
+                      No.{e.carNumber} - {e.vehicleName} {isRunning ? ' (計測・走行中)' : ''}
+                    </option>
+                  );
+                })}
               </select>
               <button 
                 onClick={() => handleStartRun(selectedCarId)}
@@ -463,13 +500,25 @@ export default function App() {
             <h2 className="font-bold text-slate-700 flex items-center gap-2">
               <Save size={18} className="text-slate-500" /> 計測結果ログ
             </h2>
-            <button 
-              onClick={handleExportCSV}
-              disabled={results.length === 0}
-              className="flex items-center gap-2 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg transition disabled:opacity-50 font-medium border border-indigo-100"
-            >
-              <Download size={16} /> CSV出力
-            </button>
+            <div className="flex items-center gap-2">
+              {role === 'A' && (
+                <button 
+                  onClick={handleClearResults}
+                  disabled={results.length === 0}
+                  className="flex items-center gap-1.5 text-sm bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg transition disabled:opacity-50 font-medium border border-rose-100"
+                  title="計測ログをリセット"
+                >
+                  <Trash2 size={16} /> ログ初期化
+                </button>
+              )}
+              <button 
+                onClick={handleExportCSV}
+                disabled={results.length === 0}
+                className="flex items-center gap-2 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg transition disabled:opacity-50 font-medium border border-indigo-100"
+              >
+                <Download size={16} /> CSV出力
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
