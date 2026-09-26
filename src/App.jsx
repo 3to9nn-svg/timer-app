@@ -16,7 +16,7 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 
-// Socket.io サーバーへの接続URL
+// Renderで発行されたバックエンドURLを設定してください
 const SOCKET_SERVER_URL = 'https://timer-server-qf32.onrender.com/';
 let socket;
 
@@ -36,44 +36,33 @@ const formatTime = (ms) => {
 const LiveTimerDisplay = ({ isRunning, startTime, offset }) => {
   const timeRef = useRef(null);
 
-useEffect(() => {
-    socket = io(SOCKET_SERVER_URL);
+  useEffect(() => {
+    let animationFrameId;
 
-    // ★ 接続成功ログ
-    socket.on('connect', () => {
-      console.log('✅ Socket.io サーバーに接続成功！ ID:', socket.id);
-    });
+    const updateDisplay = () => {
+      if (timeRef.current) {
+        let currentMs = offset;
+        if (isRunning) {
+          currentMs = Date.now() - startTime + offset;
+        }
+        timeRef.current.textContent = formatTime(currentMs);
+      }
+      
+      if (isRunning) {
+        animationFrameId = requestAnimationFrame(updateDisplay);
+      }
+    };
 
-    // ★ 接続エラーログ
-    socket.on('connect_error', (err) => {
-      console.error('❌ Socket.io 接続エラー:', err.message);
-    });
-
-    // ★ 初期データ受領ログ
-    socket.on('init', (data) => {
-      console.log('📦 初期データ受信:', data);
-      if (data.timersState) setTimersState(data.timersState);
-      if (data.entries) setEntries(data.entries);
-      if (data.results) setResults(data.results);
-    });
-
-    socket.on('timersUpdated', (updatedTimers) => {
-      setTimersState(updatedTimers);
-    });
-
-    socket.on('entriesUpdated', (updatedEntries) => {
-      console.log('📋 エントリーリストが更新されました:', updatedEntries);
-      setEntries(updatedEntries);
-    });
-
-    socket.on('resultsUpdated', (updatedResults) => {
-      setResults(updatedResults);
-    });
+    if (isRunning) {
+      animationFrameId = requestAnimationFrame(updateDisplay);
+    } else {
+      updateDisplay();
+    }
 
     return () => {
-      socket.disconnect();
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [isRunning, startTime, offset]);
 
   return (
     <div className="font-mono text-5xl md:text-6xl font-bold tracking-wider text-slate-800" ref={timeRef}>
@@ -102,8 +91,17 @@ export default function App() {
   useEffect(() => {
     socket = io(SOCKET_SERVER_URL);
 
+    socket.on('connect', () => {
+      console.log('✅ Socket.io サーバーに接続成功！ ID:', socket.id);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('❌ Socket.io 接続エラー:', err.message);
+    });
+
     // 初期状態の受領
     socket.on('init', (data) => {
+      console.log('📦 初期データ受信:', data);
       if (data.timersState) setTimersState(data.timersState);
       if (data.entries) setEntries(data.entries);
       if (data.results) setResults(data.results);
@@ -111,14 +109,17 @@ export default function App() {
 
     // 各状態の更新イベント受信
     socket.on('timersUpdated', (updatedTimers) => {
+      console.log('⏱️ タイマー状態更新:', updatedTimers);
       setTimersState(updatedTimers);
     });
 
     socket.on('entriesUpdated', (updatedEntries) => {
+      console.log('📋 エントリーリスト更新:', updatedEntries);
       setEntries(updatedEntries);
     });
 
     socket.on('resultsUpdated', (updatedResults) => {
+      console.log('🏆 計測結果更新:', updatedResults);
       setResults(updatedResults);
     });
 
@@ -204,7 +205,6 @@ export default function App() {
       measurer: `計測者${timerId}`
     });
 
-    // 記録後に自動リセット
     handleReset(timerId);
   };
 
