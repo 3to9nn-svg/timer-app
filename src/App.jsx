@@ -1,9 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { ArrowDownUp, ArrowRight, Check, ChevronRight, Download, Flag, LayoutGrid, Plus, Radio, Timer, Trash2, Trophy, Users, X } from 'lucide-react';
+import { ArrowDownUp, ArrowRight, Check, ChevronRight, Download, Eye, EyeOff, Flag, LayoutGrid, LockKeyhole, LogOut, Plus, Radio, Timer, Trash2, Trophy, Users, X } from 'lucide-react';
 import './App.css';
 
 const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'https://timer-server-qf32.onrender.com/';
+const SESSION_KEY = 'rally-timing-session';
+function readSession() {
+  try { return sessionStorage.getItem(SESSION_KEY); } catch { return null; }
+}
+function storeSession(token) {
+  try {
+    if (token) sessionStorage.setItem(SESSION_KEY, token);
+    else sessionStorage.removeItem(SESSION_KEY);
+  } catch { /* Private browsing may disable storage; this tab can still log in. */ }
+}
 const MODES = [
   { id: 'A', tag: 'MARSHAL A', title: 'スタート計測', short: 'スタート', english: 'START LINE', description: '車両を選んで、ステージへ送り出す。', icon: Timer, tone: 'orange' },
   { id: 'B', tag: 'MARSHAL B', title: 'フィニッシュ計測', short: 'フィニッシュ', english: 'FINISH LINE', description: 'ゴールの瞬間を、ワンタップで記録。', icon: Flag, tone: 'green' },
@@ -56,6 +66,10 @@ function StageGraphic() {
 }
 
 export default function App() {
+  const [accessState, setAccessState] = useState(() => readSession() ? 'checking' : 'locked');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const [role, setRole] = useState(null);
   const [sortOrder, setSortOrder] = useState('time');
   const [entries, setEntries] = useState([]);
@@ -67,31 +81,132 @@ export default function App() {
   const [newVehicleName, setNewVehicleName] = useState('');
   const [notice, setNotice] = useState('');
   const socketRef = useRef(null);
+  const accessGrantedRef = useRef(false);
   const connected = connection === 'connected';
   const currentMode = MODES.find((mode) => mode.id === role);
 
+  const lockApp = useCallback((message = '') => {
+    accessGrantedRef.current = false;
+    if (socketRef.current) {
+      socketRef.current.auth = {};
+      socketRef.current.disconnect();
+    }
+    storeSession(null);
+    setAccessState('locked');
+    setConnection('offline');
+    setLoginError(message);
+    setPassword('');
+    setShowPassword(false);
+    setRole(null);
+    setEntries([]);
+    setActiveRuns([]);
+    setResults([]);
+    setSelectedCarId('');
+    setNewCarNumber('');
+    setNewVehicleName('');
+    setNotice('');
+  }, []);
+
   useEffect(() => {
-    const socket = io(SOCKET_SERVER_URL);
+    const socket = io(SOCKET_SERVER_URL, { autoConnect: false, timeout: 15000 });
     socketRef.current = socket;
+    let verified = false;
+    socket.on('connect', () => { verified = false; });
+    socket.on('authenticated', ({ token }) => {
+      if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) return;
+      verified = true;
+      socket.auth = { token };
+      storeSession(token);
+    });
     socket.on('init', (data) => {
+      if (!verified) {
+        lockApp('サーバーのパスワード認証が有効になっていません。管理者に確認してください。');
+        return;
+      }
+      accessGrantedRef.current = true;
+      setAccessState('granted');
+      setLoginError('');
       setEntries(data.entries || []);
       setActiveRuns(data.activeRuns || []);
       setResults(data.results || []);
       setConnection('connected');
     });
-    socket.on('disconnect', () => setConnection('offline'));
-    socket.on('connect_error', () => setConnection('offline'));
+    socket.on('disconnect', (reason) => {
+      setConnection('offline');
+      if (reason === 'io server disconnect' && accessGrantedRef.current) {
+        lockApp('接続が終了しました。パスワードを入力して入り直してください。');
+      }
+    });
+    socket.on('connect_error', (error) => {
+      setConnection('offline');
+      const code = error.data?.code;
+      if (code) {
+        const messages = {
+          INVALID_PASSWORD: 'パスワードが違います。もう一度入力してください。',
+          AUTH_REQUIRED: 'パスワードを入力してください。',
+          SESSION_EXPIRED: 'ログインの有効期限が切れました。パスワードを入力してください。',
+          RATE_LIMITED: '試行回数が多すぎます。1分ほど待ってからお試しください。',
+        };
+        lockApp(messages[code] || 'ログインできませんでした。もう一度お試しください。');
+      } else if (!accessGrantedRef.current) {
+        lockApp('サーバーに接続できません。少し待ってから再度お試しください。');
+      }
+    });
+    socket.on('sessionExpired', () => lockApp('ログインが終了しました。パスワードを入力してください。'));
     socket.on('entriesUpdated', setEntries);
     socket.on('activeRunsUpdated', setActiveRuns);
     socket.on('resultsUpdated', setResults);
-    return () => { socket.disconnect(); socketRef.current = null; };
-  }, []);
+    const token = readSession();
+    if (token) { socket.auth = { token }; socket.connect(); }
+    return () => { socket.removeAllListeners(); socket.disconnect(); socketRef.current = null; };
+  }, [lockApp]);
 
   useEffect(() => {
     if (!notice) return;
     const timeout = setTimeout(() => setNotice(''), 4000);
     return () => clearTimeout(timeout);
   }, [notice]);
+
+  const login = (event) => {
+    event.preventDefault();
+    if (!password || accessState === 'checking' || !socketRef.current) return;
+    setLoginError('');
+    setAccessState('checking');
+    setConnection('connecting');
+    socketRef.current.auth = { password };
+    setPassword('');
+    setShowPassword(false);
+    socketRef.current.connect();
+  };
+
+  const logout = () => {
+    if (socketRef.current?.connected) socketRef.current.emit('logout');
+    lockApp();
+  };
+
+  if (accessState !== 'granted') {
+    return (
+      <main className="login-page">
+        <section className="login-panel" aria-labelledby="login-heading">
+          <div className="login-brand"><span className="brand-mark" aria-hidden="true"><span /><span /><span /></span><span>RALLY TIMING</span></div>
+          <div className="login-icon"><LockKeyhole size={28} /></div>
+          <span className="eyebrow orange-text">STAGE ACCESS</span>
+          <h1 id="login-heading">パスワードを入力</h1>
+          <p className="login-description">共有されたパスワードで<br />計測アプリにログインしてください。</p>
+          <form className="login-form" onSubmit={login}>
+            <label htmlFor="access-password">パスワード</label>
+            <div className="password-field">
+              <input id="access-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" autoCapitalize="none" spellCheck={false} maxLength={512} required disabled={accessState === 'checking'} aria-describedby={loginError ? 'login-error' : undefined} aria-invalid={Boolean(loginError)} />
+              <button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'} aria-pressed={showPassword}>{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
+            </div>
+            {loginError && <p className="login-error" id="login-error" role="alert">{loginError}</p>}
+            <button className="button primary-button login-submit" disabled={!password || accessState === 'checking'}><LockKeyhole size={19} />{accessState === 'checking' ? '確認しています…' : 'ログイン'}<ArrowRight size={19} /></button>
+            <p className="login-hint" role="status">{accessState === 'checking' ? 'サーバーに接続しています。しばらくお待ちください。' : 'ログインはこのタブで最大12時間有効です。'}</p>
+          </form>
+        </section>
+      </main>
+    );
+  }
 
   const changeMode = (nextRole) => {
     setRole(nextRole);
@@ -168,7 +283,7 @@ export default function App() {
       </div></div>
       {role === 'viewer' && <div className="results-options"><div className="segmented-control" aria-label="結果の並び順"><button aria-pressed={sortOrder === 'time'} onClick={() => setSortOrder('time')}><Trophy size={16} />タイム順</button><button aria-pressed={sortOrder === 'latest'} onClick={() => setSortOrder('latest')}><ArrowDownUp size={16} />新着順</button></div><span className="eyebrow">TIME / MM:SS.00</span></div>}
       {!results.length ? <EmptyState icon={Trophy} title="まだ計測結果はありません" description="フィニッシュした車両のタイムがここに表示されます。" /> : (
-        <ol className="result-list">{sortedResults.map((result, index) => (
+        <ol className={`result-list ${role === 'viewer' && sortOrder === 'time' ? 'ranked-results' : ''}`}>{sortedResults.map((result, index) => (
           <li className={`result-row ${role === 'viewer' && sortOrder === 'time' && index === 0 ? 'leader' : ''}`} key={result.id}>
             {role === 'viewer' && sortOrder === 'time' && <span className="position">{String(index + 1).padStart(2, '0')}</span>}
             <div className="result-car"><span className="result-number">#{result.carNumber}</span><strong>{result.vehicleName}</strong><span className="result-date">{new Date(result.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} フィニッシュ</span></div>
@@ -208,7 +323,7 @@ export default function App() {
           </div>}
         </>}
       </main>
-      <footer className="site-footer"><span>RALLY TIMING<span className="footer-slash"> /// </span>STAGE CONTROL</span><span>1/100 SEC. DISPLAY</span></footer>
+      <footer className="site-footer"><span>RALLY TIMING<span className="footer-slash"> /// </span>STAGE CONTROL</span><button className="logout-button" onClick={logout}><LogOut size={16} />ログアウト</button><span>1/100 SEC. DISPLAY</span></footer>
       {role && <nav className="bottom-nav" aria-label="担当モード">{MODES.map((mode) => { const Icon = mode.icon; return <button key={mode.id} aria-current={role === mode.id ? 'page' : undefined} onClick={() => changeMode(mode.id)}><Icon size={21} /><span>{mode.short}</span></button>; })}</nav>}
       {notice && <div className="toast" role="status"><Check size={18} />{notice}</div>}
     </div>
