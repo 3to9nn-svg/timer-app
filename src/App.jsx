@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 // RenderのバックエンドURLを設定してください
-const SOCKET_SERVER_URL = 'https://timer-server.onrender.com';
+const SOCKET_SERVER_URL = 'https://timer-server-qf32.onrender.com/';
 let socket;
 
 // 時間フォーマット関数 (ミリ秒 -> MM:SS.ms)
