@@ -36,33 +36,44 @@ const formatTime = (ms) => {
 const LiveTimerDisplay = ({ isRunning, startTime, offset }) => {
   const timeRef = useRef(null);
 
-  useEffect(() => {
-    let animationFrameId;
+useEffect(() => {
+    socket = io(SOCKET_SERVER_URL);
 
-    const updateDisplay = () => {
-      if (timeRef.current) {
-        let currentMs = offset;
-        if (isRunning) {
-          currentMs = Date.now() - startTime + offset;
-        }
-        timeRef.current.textContent = formatTime(currentMs);
-      }
-      
-      if (isRunning) {
-        animationFrameId = requestAnimationFrame(updateDisplay);
-      }
-    };
+    // ★ 接続成功ログ
+    socket.on('connect', () => {
+      console.log('✅ Socket.io サーバーに接続成功！ ID:', socket.id);
+    });
 
-    if (isRunning) {
-      animationFrameId = requestAnimationFrame(updateDisplay);
-    } else {
-      updateDisplay();
-    }
+    // ★ 接続エラーログ
+    socket.on('connect_error', (err) => {
+      console.error('❌ Socket.io 接続エラー:', err.message);
+    });
+
+    // ★ 初期データ受領ログ
+    socket.on('init', (data) => {
+      console.log('📦 初期データ受信:', data);
+      if (data.timersState) setTimersState(data.timersState);
+      if (data.entries) setEntries(data.entries);
+      if (data.results) setResults(data.results);
+    });
+
+    socket.on('timersUpdated', (updatedTimers) => {
+      setTimersState(updatedTimers);
+    });
+
+    socket.on('entriesUpdated', (updatedEntries) => {
+      console.log('📋 エントリーリストが更新されました:', updatedEntries);
+      setEntries(updatedEntries);
+    });
+
+    socket.on('resultsUpdated', (updatedResults) => {
+      setResults(updatedResults);
+    });
 
     return () => {
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      socket.disconnect();
     };
-  }, [isRunning, startTime, offset]);
+  }, []);
 
   return (
     <div className="font-mono text-5xl md:text-6xl font-bold tracking-wider text-slate-800" ref={timeRef}>
