@@ -6,21 +6,20 @@ import {
   XCircle, 
   Download, 
   Users, 
-  Car, 
-  Clock, 
-  ClipboardList,
+  Save, 
+  Trash2, 
+  Trophy, 
+  ArrowUpDown, 
+  Plus, 
+  Gauge, 
+  Flag, 
+  Zap,
+  UserPlus,
   Flame,
-  Save,
-  Trash2,
-  Trophy,
-  ArrowUpDown,
-  Plus,
-  Gauge,
-  Flag,
-  Zap
+  ClipboardList
 } from 'lucide-react';
 
-// RenderのバックエンドURLを設定してください
+// RenderのバックエンドURL
 const SOCKET_SERVER_URL = 'https://timer-server-qf32.onrender.com/';
 let socket;
 
@@ -37,7 +36,7 @@ const formatTime = (ms) => {
 };
 
 // リアルタイムタイマー (WRCデジタルメーター風)
-const LiveTimer = ({ startTime, size = 'normal' }) => {
+const LiveTimer = ({ startTime }) => {
   const timeRef = useRef(null);
 
   useEffect(() => {
@@ -58,13 +57,9 @@ const LiveTimer = ({ startTime, size = 'normal' }) => {
     };
   }, [startTime]);
 
-  const textSizeClass = size === 'large' 
-    ? 'text-3xl sm:text-4xl text-amber-400' 
-    : 'text-2xl sm:text-3xl text-amber-400';
-
   return (
     <span 
-      className={`font-mono italic font-black tracking-wider ${textSizeClass} drop-shadow-[0_0_12px_rgba(251,191,36,0.3)]`} 
+      className="font-mono italic font-black text-xl sm:text-2xl text-amber-400 tracking-wider drop-shadow-[0_0_8px_rgba(251,191,36,0.3)]" 
       ref={timeRef}
     >
       00:00.00
@@ -73,7 +68,7 @@ const LiveTimer = ({ startTime, size = 'normal' }) => {
 };
 
 export default function App() {
-  const [role, setRole] = useState(null); // 'viewer', 'A', 'B'
+  const [role, setRole] = useState(null); // 'viewer', 'A', 'B', 'entry'
   const [viewerSortOrder, setViewerSortOrder] = useState('time'); // 'latest' or 'time'
   
   // データステート
@@ -113,7 +108,7 @@ export default function App() {
     };
   }, []);
 
-  // 操作アクション
+  // アクションハンドラ
   const handleStartRun = (carId) => {
     if (!carId) return;
     socket.emit('startRun', { carId });
@@ -148,7 +143,9 @@ export default function App() {
   };
 
   const handleDeleteEntry = (entryId) => {
-    socket.emit('deleteEntry', entryId);
+    if (window.confirm('このエントリーを削除してもよろしいですか？')) {
+      socket.emit('deleteEntry', entryId);
+    }
   };
 
   const handleExportCSV = () => {
@@ -174,7 +171,7 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  // 閲覧者用：ソート済み結果データ生成
+  // 閲覧者用：ソート済み結果
   const getSortedResults = () => {
     const list = [...results];
     if (viewerSortOrder === 'time') {
@@ -184,15 +181,14 @@ export default function App() {
   };
 
   // ==========================================
-  // 1. 役割選択画面 (WRC Select Mode)
+  // 1. 役割選択画面 (Select Mode)
   // ==========================================
   if (!role) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 selection:bg-orange-500 selection:text-white">
-        {/* 背景装飾 */}
         <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-orange-900/20 via-slate-950 to-slate-950 pointer-events-none" />
         
-        <div className="relative bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center space-y-6 sm:space-y-8">
+        <div className="relative bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 max-w-md w-full text-center space-y-6">
           <div>
             <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 px-3.5 py-1.5 rounded-full text-orange-400 font-extrabold text-xs uppercase tracking-widest mb-4">
               <Zap size={14} className="animate-pulse" /> Official Timing System
@@ -200,30 +196,40 @@ export default function App() {
             <h1 className="text-3xl font-black italic tracking-wider uppercase text-white flex items-center justify-center gap-2">
               <span className="text-orange-500">RALLY</span> TIMING
             </h1>
-            <p className="text-slate-400 text-xs mt-1.5 font-medium">担当するコントロールモードを選択してください</p>
+            <p className="text-slate-400 text-xs mt-1.5 font-medium">担当するモードを選択してください</p>
           </div>
           
           <div className="space-y-3">
             <button 
               onClick={() => setRole('viewer')}
-              className="w-full py-4 px-5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-slate-200 rounded-2xl font-black italic uppercase tracking-wider transition active:scale-[0.98] flex items-center justify-between group"
+              className="w-full py-3.5 px-5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-slate-200 rounded-2xl font-black italic uppercase tracking-wider transition active:scale-[0.98] flex items-center justify-between group"
             >
-              <span className="flex items-center gap-3"><Users size={20} className="text-slate-400 group-hover:text-white" /> 閲覧者モード</span>
+              <span className="flex items-center gap-3"><Users size={18} className="text-slate-400 group-hover:text-white" /> 閲覧者モード</span>
               <span className="text-xs bg-slate-700/50 text-slate-400 px-2.5 py-1 rounded-md font-mono">LIVE</span>
             </button>
+            
             <button 
               onClick={() => setRole('A')}
-              className="w-full py-4 px-5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-2xl font-black italic uppercase tracking-wider transition active:scale-[0.98] shadow-lg shadow-orange-950/50 flex items-center justify-between"
+              className="w-full py-3.5 px-5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-2xl font-black italic uppercase tracking-wider transition active:scale-[0.98] shadow-lg shadow-orange-950/50 flex items-center justify-between"
             >
-              <span className="flex items-center gap-3"><Play size={20} /> 計測者 A (START)</span>
+              <span className="flex items-center gap-3"><Play size={18} /> 計測者 A (START)</span>
               <span className="text-xs bg-black/30 px-2 py-0.5 rounded font-mono">STAGE IN</span>
             </button>
+            
             <button 
               onClick={() => setRole('B')}
-              className="w-full py-4 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black italic uppercase tracking-wider transition active:scale-[0.98] shadow-lg shadow-emerald-950/50 flex items-center justify-between"
+              className="w-full py-3.5 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black italic uppercase tracking-wider transition active:scale-[0.98] shadow-lg shadow-emerald-950/50 flex items-center justify-between"
             >
-              <span className="flex items-center gap-3"><Square size={20} /> 計測者 B (FINISH)</span>
+              <span className="flex items-center gap-3"><Square size={18} /> 計測者 B (FINISH)</span>
               <span className="text-xs bg-black/30 px-2 py-0.5 rounded font-mono">STOP</span>
+            </button>
+
+            <button 
+              onClick={() => setRole('entry')}
+              className="w-full py-3.5 px-5 bg-slate-800 hover:bg-slate-700 border border-amber-500/40 text-amber-400 rounded-2xl font-black italic uppercase tracking-wider transition active:scale-[0.98] flex items-center justify-between"
+            >
+              <span className="flex items-center gap-3"><UserPlus size={18} /> エントリー管理</span>
+              <span className="text-xs bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-md font-mono">EDIT</span>
             </button>
           </div>
 
@@ -243,7 +249,6 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 pb-12 selection:bg-orange-500 selection:text-white">
-        {/* ヘッダー */}
         <header className="bg-slate-900/90 backdrop-blur-md sticky top-0 z-20 border-b border-slate-800 shadow-xl">
           <div className="max-w-5xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -265,7 +270,6 @@ export default function App() {
 
         <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
           <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-            {/* パネルヘッダー */}
             <div className="p-4 bg-slate-900 border-b border-slate-800 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center justify-between sm:justify-start gap-3">
                 <div className="flex items-center gap-2">
@@ -278,7 +282,6 @@ export default function App() {
               </div>
 
               <div className="flex items-center justify-between sm:justify-end gap-2">
-                {/* 並び替えスイッチ */}
                 <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold flex-1 sm:flex-none justify-center">
                   <button 
                     onClick={() => setViewerSortOrder('time')}
@@ -308,53 +311,16 @@ export default function App() {
               </div>
             </div>
 
-            {/* モバイル用表示 (WRC カード形式) */}
-            <div className="block sm:hidden divide-y divide-slate-800/60">
-              {sortedResults.length === 0 ? (
-                <div className="py-12 text-center text-slate-500 text-sm font-mono">NO STAGE TIMES RECORDED</div>
-              ) : (
-                sortedResults.map((r, index) => (
-                  <div key={r.id} className="p-3.5 flex items-center justify-between gap-3 bg-slate-900/40">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {viewerSortOrder === 'time' && (
-                        <div className={`w-7 text-center font-black italic text-base ${
-                          index === 0 ? 'text-amber-400 text-lg' : index === 1 ? 'text-slate-300' : index === 2 ? 'text-amber-600' : 'text-slate-500'
-                        }`}>
-                          P{index + 1}
-                        </div>
-                      )}
-                      
-                      {/* ゼッケン表示 */}
-                      <div className="bg-amber-400 text-slate-950 font-black italic text-sm px-2 py-1 rounded shrink-0 shadow-md">
-                        #{r.carNumber}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="font-bold text-slate-100 text-sm truncate">{r.vehicleName}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">
-                          {new Date(r.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="font-mono font-black italic text-lg text-amber-400 shrink-0 tracking-wider">
-                      {formatTime(r.timeMs)}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* PC/タブレット用表示 (WRC テーブル形式) */}
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            {/* 表形式 (全デバイス共通) */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[480px]">
                 <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-xs font-mono uppercase">
                   <tr>
-                    {viewerSortOrder === 'time' && <th className="py-3 px-6 w-16">POS</th>}
-                    <th className="py-3 px-6 w-28">TIME</th>
-                    <th className="py-3 px-6 w-28">NO.</th>
-                    <th className="py-3 px-6">ENTRY / CAR</th>
-                    <th className="py-3 px-6 text-right">STAGE TIME</th>
+                    {viewerSortOrder === 'time' && <th className="py-3 px-4 w-14 text-center">POS</th>}
+                    <th className="py-3 px-4 w-20">NO.</th>
+                    <th className="py-3 px-4">DRIVER / CAR</th>
+                    <th className="py-3 px-4 w-24">PASS TIME</th>
+                    <th className="py-3 px-4 text-right">STAGE TIME</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
@@ -368,20 +334,20 @@ export default function App() {
                     sortedResults.map((r, index) => (
                       <tr key={r.id} className="hover:bg-slate-800/40 transition">
                         {viewerSortOrder === 'time' && (
-                          <td className="py-3.5 px-6 font-black italic text-base">
+                          <td className="py-3.5 px-4 font-black italic text-center text-base">
                             {index === 0 ? <span className="text-amber-400">P1</span> : index === 1 ? <span className="text-slate-300">P2</span> : index === 2 ? <span className="text-amber-600">P3</span> : <span className="text-slate-500">P{index + 1}</span>}
                           </td>
                         )}
-                        <td className="py-3.5 px-6 text-xs text-slate-500 font-mono">
-                          {new Date(r.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}
-                        </td>
-                        <td className="py-3.5 px-6">
+                        <td className="py-3.5 px-4">
                           <span className="bg-amber-400 text-slate-950 font-black italic text-xs px-2.5 py-1 rounded">
                             #{r.carNumber}
                           </span>
                         </td>
-                        <td className="py-3.5 px-6 font-bold text-slate-200 text-sm">{r.vehicleName}</td>
-                        <td className="py-3.5 px-6 text-right font-mono font-black italic text-xl text-amber-400 tracking-wider">
+                        <td className="py-3.5 px-4 font-bold text-slate-200 text-sm">{r.vehicleName}</td>
+                        <td className="py-3.5 px-4 text-xs text-slate-500 font-mono">
+                          {new Date(r.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono font-black italic text-lg sm:text-xl text-amber-400 tracking-wider">
                           {formatTime(r.timeMs)}
                         </td>
                       </tr>
@@ -397,7 +363,122 @@ export default function App() {
   }
 
   // ==========================================
-  // 3. 計測者 (A/B) 画面
+  // 3. エントリー管理画面 (Entry Mode)
+  // ==========================================
+  if (role === 'entry') {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 pb-12 selection:bg-orange-500 selection:text-white">
+        <header className="bg-slate-900/90 backdrop-blur-md sticky top-0 z-20 border-b border-slate-800 shadow-xl">
+          <div className="max-w-4xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="bg-amber-400 p-1.5 rounded-lg text-slate-950 font-black">
+                <UserPlus size={18} />
+              </div>
+              <h1 className="font-black italic text-lg sm:text-xl tracking-wider text-white uppercase">
+                ENTRY <span className="text-amber-400">MANAGEMENT</span>
+              </h1>
+            </div>
+            <button 
+              onClick={() => setRole(null)} 
+              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg font-bold border border-slate-700 transition"
+            >
+              MODE
+            </button>
+          </div>
+        </header>
+
+        <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+          <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div className="p-4 bg-slate-900 border-b border-slate-800">
+              <h2 className="font-black italic text-sm sm:text-base text-slate-200 tracking-wider flex items-center gap-2 uppercase">
+                <Plus size={18} className="text-amber-400" /> REGISTRATION FORM
+              </h2>
+            </div>
+            
+            <form onSubmit={handleAddEntry} className="p-4 flex flex-col sm:flex-row gap-3">
+              <input 
+                type="text" 
+                inputMode="numeric"
+                placeholder="No. (例: 101)" 
+                value={newCarNumber}
+                onChange={e => setNewCarNumber(e.target.value)}
+                className="w-full sm:w-36 px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-sm font-bold text-white placeholder-slate-500 outline-none focus:border-amber-400"
+              />
+              <input 
+                type="text" 
+                placeholder="車両名・チーム名 (DRIVER / CAR)" 
+                value={newVehicleName}
+                onChange={e => setNewVehicleName(e.target.value)}
+                className="flex-1 px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-sm font-bold text-white placeholder-slate-500 outline-none focus:border-amber-400"
+              />
+              <button 
+                type="submit" 
+                disabled={!newCarNumber.trim() || !newVehicleName.trim()} 
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 rounded-xl text-sm font-black italic tracking-wider uppercase disabled:opacity-30 transition flex items-center justify-center gap-1.5 shrink-0 shadow-lg shadow-amber-950/40"
+              >
+                <Plus size={18} /> ADD ENTRY
+              </button>
+            </form>
+          </section>
+
+          <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+              <h2 className="font-black italic text-sm sm:text-base text-slate-200 tracking-wider flex items-center gap-2 uppercase">
+                <ClipboardList size={18} className="text-slate-400" /> REGISTERED ENTRIES
+              </h2>
+              <span className="bg-slate-800 border border-slate-700 text-slate-300 text-xs px-2.5 py-0.5 rounded-full font-mono font-bold">
+                {entries.length} ENTRIES
+              </span>
+            </div>
+
+            {/* エントリー表形式 */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[400px]">
+                <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-xs font-mono uppercase">
+                  <tr>
+                    <th className="py-3 px-4 w-24">NO.</th>
+                    <th className="py-3 px-4">DRIVER / CAR</th>
+                    <th className="py-3 px-4 w-24 text-right">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {entries.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="py-12 text-center text-slate-500 text-sm font-mono">
+                        NO ENTRIES REGISTERED
+                      </td>
+                    </tr>
+                  ) : (
+                    entries.map(entry => (
+                      <tr key={entry.id} className="hover:bg-slate-800/30 transition">
+                        <td className="py-3.5 px-4">
+                          <span className="bg-amber-400 text-slate-950 font-black italic text-xs px-2.5 py-1 rounded">
+                            #{entry.carNumber}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-sm font-bold text-slate-200">{entry.vehicleName}</td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button 
+                            onClick={() => handleDeleteEntry(entry.id)}
+                            className="text-xs text-rose-400 hover:text-rose-300 font-bold px-3 py-1.5 rounded-lg bg-rose-950/40 border border-rose-900/60 transition inline-flex items-center gap-1"
+                          >
+                            <Trash2 size={13} /> 削除
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // 4. 計測者 (A/B) 画面
   // ==========================================
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 pb-20 selection:bg-orange-500 selection:text-white">
@@ -464,7 +545,7 @@ export default function App() {
           </section>
         )}
 
-        {/* 【計測中・走行中車両一覧】 */}
+        {/* 【走行中車両（LIVE ON STAGE）- 表形式】 */}
         <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
           <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
             <h2 className="font-black italic text-sm sm:text-base text-slate-200 tracking-wider flex items-center gap-2 uppercase">
@@ -475,142 +556,53 @@ export default function App() {
             </span>
           </div>
 
-          <div className="p-3 sm:p-5">
-            {activeRuns.length === 0 ? (
-              <div className="text-center py-8 text-slate-500 text-sm font-mono">NO CARS ON STAGE</div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                {activeRuns.map(run => (
-                  <div key={run.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-center justify-between gap-3 shadow-inner">
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-amber-400 text-slate-950 font-black italic text-xs px-2 py-0.5 rounded">
-                          #{run.carNumber}
-                        </span>
-                        <span className="font-bold text-slate-200 text-sm truncate">{run.vehicleName}</span>
-                      </div>
-                      <div className="pt-1">
-                        <LiveTimer startTime={run.startTime} size={role === 'B' ? 'large' : 'normal'} />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2 shrink-0">
-                      {role === 'B' && (
-                        <button 
-                          onClick={() => handleStopRun(run.id)}
-                          className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.97] text-white rounded-xl font-black italic text-base tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/80 transition"
-                        >
-                          <Square size={18} /> FINISH
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => handleCancelRun(run.id)}
-                        className="text-xs text-rose-400 hover:text-rose-300 flex items-center justify-center gap-1 py-1 font-bold"
-                      >
-                        <XCircle size={14} /> CANCEL
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* 【エントリーリスト】 */}
-        <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-            <h2 className="font-black italic text-sm sm:text-base text-slate-200 tracking-wider flex items-center gap-2 uppercase">
-              <ClipboardList size={18} className="text-slate-400" /> ENTRY LIST
-            </h2>
-            <span className="bg-slate-800 border border-slate-700 text-slate-300 text-xs px-2.5 py-0.5 rounded-full font-mono font-bold">
-              {entries.length} ENTRIES
-            </span>
-          </div>
-
-          {/* エントリー追加フォーム */}
-          <div className="p-3 sm:p-4 border-b border-slate-800 bg-slate-950/40">
-            <form onSubmit={handleAddEntry} className="flex flex-col sm:flex-row gap-2.5">
-              <input 
-                type="text" 
-                inputMode="numeric"
-                placeholder="No. (例: 101)" 
-                value={newCarNumber}
-                onChange={e => setNewCarNumber(e.target.value)}
-                className="w-full sm:w-36 px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-bold text-white placeholder-slate-500 outline-none focus:border-orange-500"
-              />
-              <input 
-                type="text" 
-                placeholder="車両名・チーム名 (DRIVER / CAR)" 
-                value={newVehicleName}
-                onChange={e => setNewVehicleName(e.target.value)}
-                className="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-bold text-white placeholder-slate-500 outline-none focus:border-orange-500"
-              />
-              <button 
-                type="submit" 
-                disabled={!newCarNumber.trim() || !newVehicleName.trim()} 
-                className="w-full sm:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 text-slate-200 rounded-xl text-xs font-black italic tracking-wider uppercase disabled:opacity-30 transition flex items-center justify-center gap-1.5 shrink-0"
-              >
-                <Plus size={16} /> ADD ENTRY
-              </button>
-            </form>
-          </div>
-
-          {/* モバイル表示 (カード) */}
-          <div className="block sm:hidden divide-y divide-slate-800/60">
-            {entries.length === 0 ? (
-              <div className="py-6 text-center text-slate-500 text-xs font-mono">NO ENTRIES</div>
-            ) : (
-              entries.map(entry => (
-                <div key={entry.id} className="p-3 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="bg-amber-400 text-slate-950 font-black italic text-xs px-2 py-0.5 rounded shrink-0">
-                      #{entry.carNumber}
-                    </span>
-                    <span className="font-bold text-slate-200 text-sm truncate">{entry.vehicleName}</span>
-                  </div>
-                  <button 
-                    onClick={() => handleDeleteEntry(entry.id)}
-                    className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2.5 py-1 rounded bg-rose-950/40 border border-rose-900/60 shrink-0"
-                  >
-                    削除
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* PC表示 (テーブル) */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[500px]">
               <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-xs font-mono uppercase">
                 <tr>
-                  <th className="py-2.5 px-6 w-28">NO.</th>
-                  <th className="py-2.5 px-6">DRIVER / CAR</th>
-                  <th className="py-2.5 px-6 w-28 text-right">ACTION</th>
+                  <th className="py-3 px-4 w-20">NO.</th>
+                  <th className="py-3 px-4">DRIVER / CAR</th>
+                  <th className="py-3 px-4 w-36">LIVE TIME</th>
+                  <th className="py-3 px-4 text-right w-36">ACTION</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
-                {entries.length === 0 ? (
+                {activeRuns.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-slate-500 text-sm font-mono">NO ENTRIES</td>
+                    <td colSpan={4} className="py-8 text-center text-slate-500 text-sm font-mono">
+                      NO CARS ON STAGE
+                    </td>
                   </tr>
                 ) : (
-                  entries.map(entry => (
-                    <tr key={entry.id} className="hover:bg-slate-800/30 transition">
-                      <td className="py-3 px-6">
-                        <span className="bg-amber-400 text-slate-950 font-black italic text-xs px-2.5 py-0.5 rounded">
-                          #{entry.carNumber}
+                  activeRuns.map(run => (
+                    <tr key={run.id} className="hover:bg-slate-800/30 transition">
+                      <td className="py-3.5 px-4">
+                        <span className="bg-amber-400 text-slate-950 font-black italic text-xs px-2.5 py-1 rounded">
+                          #{run.carNumber}
                         </span>
                       </td>
-                      <td className="py-3 px-6 text-sm font-bold text-slate-200">{entry.vehicleName}</td>
-                      <td className="py-3 px-6 text-right">
-                        <button 
-                          onClick={() => handleDeleteEntry(entry.id)}
-                          className="text-xs text-rose-400 hover:text-rose-300 font-bold"
-                        >
-                          削除
-                        </button>
+                      <td className="py-3.5 px-4 font-bold text-slate-200 text-sm">{run.vehicleName}</td>
+                      <td className="py-3.5 px-4">
+                        <LiveTimer startTime={run.startTime} />
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {role === 'B' && (
+                            <button 
+                              onClick={() => handleStopRun(run.id)}
+                              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.97] text-white rounded-xl font-black italic text-xs sm:text-sm tracking-wider flex items-center gap-1 shadow-lg shadow-emerald-950/80 transition"
+                            >
+                              <Square size={15} /> FINISH
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleCancelRun(run.id)}
+                            className="text-xs text-rose-400 hover:text-rose-300 font-bold p-1 rounded"
+                            title="キャンセル"
+                          >
+                            <XCircle size={18} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -620,7 +612,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* 【計測結果ログ】 */}
+        {/* 【計測結果ログ - 表形式】 */}
         <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
           <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
             <h2 className="font-black italic text-sm sm:text-base text-slate-200 tracking-wider flex items-center gap-2 uppercase">
@@ -646,61 +638,36 @@ export default function App() {
             </div>
           </div>
 
-          {/* モバイル表示 (カード) */}
-          <div className="block sm:hidden divide-y divide-slate-800/60">
-            {results.length === 0 ? (
-              <div className="py-8 text-center text-slate-500 text-xs font-mono">NO TIMING LOGS</div>
-            ) : (
-              results.map(r => (
-                <div key={r.id} className="p-3.5 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="bg-amber-400 text-slate-950 font-black italic text-xs px-2 py-0.5 rounded shrink-0">
-                      #{r.carNumber}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="font-bold text-slate-200 text-sm truncate">{r.vehicleName}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">
-                        {new Date(r.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="font-mono font-black italic text-base text-amber-400 shrink-0 tracking-wider">
-                    {formatTime(r.timeMs)}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* PC表示 (テーブル) */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[480px]">
               <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-xs font-mono uppercase">
                 <tr>
-                  <th className="py-2.5 px-6 w-28">TIME</th>
-                  <th className="py-2.5 px-6 w-28">NO.</th>
-                  <th className="py-2.5 px-6">DRIVER / CAR</th>
-                  <th className="py-2.5 px-6 text-right">STAGE TIME</th>
+                  <th className="py-3 px-4 w-20">NO.</th>
+                  <th className="py-3 px-4">DRIVER / CAR</th>
+                  <th className="py-3 px-4 w-24">PASS TIME</th>
+                  <th className="py-3 px-4 text-right">STAGE TIME</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
                 {results.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-500 text-sm font-mono">NO TIMING LOGS</td>
+                    <td colSpan={4} className="py-8 text-center text-slate-500 text-sm font-mono">
+                      NO TIMING LOGS
+                    </td>
                   </tr>
                 ) : (
                   results.map(r => (
                     <tr key={r.id} className="hover:bg-slate-800/30 transition">
-                      <td className="py-3 px-6 text-xs text-slate-500 font-mono">
-                        {new Date(r.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}
-                      </td>
-                      <td className="py-3 px-6">
+                      <td className="py-3 px-4">
                         <span className="bg-amber-400 text-slate-950 font-black italic text-xs px-2.5 py-0.5 rounded">
                           #{r.carNumber}
                         </span>
                       </td>
-                      <td className="py-3 px-6 font-bold text-slate-200 text-sm">{r.vehicleName}</td>
-                      <td className="py-3 px-6 text-right font-mono font-black italic text-lg text-amber-400 tracking-wider">
+                      <td className="py-3 px-4 font-bold text-slate-200 text-sm">{r.vehicleName}</td>
+                      <td className="py-3 px-4 text-xs text-slate-500 font-mono">
+                        {new Date(r.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-black italic text-lg text-amber-400 tracking-wider">
                         {formatTime(r.timeMs)}
                       </td>
                     </tr>
