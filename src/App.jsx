@@ -1,684 +1,216 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { 
-  Play, 
-  Square, 
-  XCircle, 
-  Download, 
-  Users, 
-  Save, 
-  Trash2, 
-  Trophy, 
-  ArrowUpDown, 
-  Plus, 
-  Gauge, 
-  Flag, 
-  Zap,
-  UserPlus,
-  Flame,
-  ClipboardList
-} from 'lucide-react';
+import { ArrowDownUp, ArrowRight, Check, ChevronRight, Download, Flag, LayoutGrid, Plus, Radio, Timer, Trash2, Trophy, Users, X } from 'lucide-react';
+import './App.css';
 
-// RenderのバックエンドURL
-const SOCKET_SERVER_URL = 'https://timer-server-qf32.onrender.com/';
-let socket;
+const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'https://timer-server-qf32.onrender.com/';
+const MODES = [
+  { id: 'A', tag: 'MARSHAL A', title: 'スタート計測', short: 'スタート', english: 'START LINE', description: '車両を選んで、ステージへ送り出す。', icon: Timer, tone: 'orange' },
+  { id: 'B', tag: 'MARSHAL B', title: 'フィニッシュ計測', short: 'フィニッシュ', english: 'FINISH LINE', description: 'ゴールの瞬間を、ワンタップで記録。', icon: Flag, tone: 'green' },
+  { id: 'viewer', tag: 'SPECTATOR', title: 'リザルトを見る', short: 'リザルト', english: 'LIVE RESULTS', description: '走行状況とタイムをリアルタイムに。', icon: Trophy, tone: 'white' },
+  { id: 'entry', tag: 'ORGANIZER', title: 'エントリー管理', short: 'エントリー', english: 'ENTRY LIST', description: '参加する車両・チームを登録する。', icon: Users, tone: 'muted' },
+];
 
-// 時間フォーマット関数 (ミリ秒 -> MM:SS.ms)
-const formatTime = (ms) => {
-  if (ms < 0) ms = 0;
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  const hundredths = Math.floor((ms % 1000) / 10);
-  
-  const pad = (num, size = 2) => num.toString().padStart(size, '0');
-  
-  return `${pad(minutes)}:${pad(seconds)}.${pad(hundredths)}`;
-};
+function formatTime(ms) {
+  const safeMs = Math.max(0, ms);
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${pad(Math.floor(safeMs / 60000))}:${pad(Math.floor(safeMs / 1000) % 60)}.${pad(Math.floor(safeMs / 10) % 100)}`;
+}
 
-// リアルタイムタイマー (WRCデジタルメーター風)
-const LiveTimer = ({ startTime }) => {
-  const timeRef = useRef(null);
-
+function LiveTimer({ startTime }) {
+  const ref = useRef(null);
   useEffect(() => {
-    let animationFrameId;
-
-    const updateDisplay = () => {
-      if (timeRef.current) {
-        const currentMs = Date.now() - startTime;
-        timeRef.current.textContent = formatTime(currentMs);
-      }
-      animationFrameId = requestAnimationFrame(updateDisplay);
+    let frame;
+    const update = () => {
+      if (ref.current) ref.current.textContent = formatTime(Date.now() - startTime);
+      frame = requestAnimationFrame(update);
     };
-
-    animationFrameId = requestAnimationFrame(updateDisplay);
-
-    return () => {
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    };
+    update();
+    return () => cancelAnimationFrame(frame);
   }, [startTime]);
+  return <span className="live-time" ref={ref}>00:00.00</span>;
+}
 
+function EmptyState({ icon: Icon, title, description }) {
+  return <div className="empty-state"><Icon size={28} strokeWidth={1.4} /><strong>{title}</strong><p>{description}</p></div>;
+}
+
+function StageGraphic() {
   return (
-    <span 
-      className="font-mono italic font-black text-2xl sm:text-3xl text-amber-400 tracking-wider drop-shadow-[0_0_8px_rgba(251,191,36,0.3)]" 
-      ref={timeRef}
-    >
-      00:00.00
-    </span>
+    <div className="stage-graphic" aria-hidden="true">
+      <div className="graphic-heading"><span><i className="status-dot" /> STAGE TELEMETRY</span><span>R / T</span></div>
+      <svg viewBox="0 0 520 260" fill="none">
+        <g className="contours" stroke="currentColor">
+          <path d="M-40 180C80 90 40 5 200 20S300 170 540 30M-40 202C90 100 60 25 200 40S315 200 550 52M-40 224C100 125 90 50 210 65S320 225 550 78M-30 250C105 145 105 75 212 90S350 245 560 108M-30 276C110 175 125 105 218 118S360 260 555 140M-20 298C130 210 138 132 225 143S350 290 550 178" />
+          <path d="M100-30C140 5 235-10 300 40S350 100 530-20M135-35C180-5 240-30 320 22S370 70 540-40M150 275C195 185 240 180 285 215S360 260 430 280" />
+        </g>
+        <path d="M72 199L117 173Q127 167 125 153L122 140Q120 129 135 125L204 108Q218 106 227 116L252 145Q263 158 278 149L309 129Q321 120 311 109L294 92Q285 80 301 74L352 56Q366 51 377 61L416 93L450 75" stroke="#ff692e" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="72" cy="199" r="12" fill="#10222d" stroke="#ff692e" strokeWidth="2" /><circle cx="72" cy="199" r="4" fill="#ff692e" />
+        <circle cx="450" cy="75" r="12" fill="#10222d" stroke="#e9eeed" strokeWidth="2" /><rect x="446" y="71" width="8" height="8" fill="#e9eeed" />
+        <text x="45" y="235">START</text><text x="418" y="46">FINISH</text>
+        <path d="M30 30h15m-7.5-7.5v15M480 230h15m-7.5-7.5v15" stroke="#647681" />
+      </svg>
+      <div className="graphic-footer"><span>EVERY SECOND COUNTS.</span><span className="checkered" /></div>
+    </div>
   );
-};
+}
 
 export default function App() {
-  const [role, setRole] = useState(null); // 'viewer', 'A', 'B', 'entry'
-  const [viewerSortOrder, setViewerSortOrder] = useState('time'); // 'latest' or 'time'
-  
-  // データステート
+  const [role, setRole] = useState(null);
+  const [sortOrder, setSortOrder] = useState('time');
   const [entries, setEntries] = useState([]);
   const [activeRuns, setActiveRuns] = useState([]);
   const [results, setResults] = useState([]);
-
-  // フォームステート
+  const [connection, setConnection] = useState('connecting');
   const [selectedCarId, setSelectedCarId] = useState('');
   const [newCarNumber, setNewCarNumber] = useState('');
   const [newVehicleName, setNewVehicleName] = useState('');
+  const [notice, setNotice] = useState('');
+  const socketRef = useRef(null);
+  const connected = connection === 'connected';
+  const currentMode = MODES.find((mode) => mode.id === role);
 
-  // Socket.io 接続
   useEffect(() => {
-    socket = io(SOCKET_SERVER_URL);
-
+    const socket = io(SOCKET_SERVER_URL);
+    socketRef.current = socket;
     socket.on('init', (data) => {
-      if (data.entries) setEntries(data.entries);
-      if (data.activeRuns) setActiveRuns(data.activeRuns);
-      if (data.results) setResults(data.results);
+      setEntries(data.entries || []);
+      setActiveRuns(data.activeRuns || []);
+      setResults(data.results || []);
+      setConnection('connected');
     });
-
-    socket.on('entriesUpdated', (updatedEntries) => {
-      setEntries(updatedEntries);
-    });
-
-    socket.on('activeRunsUpdated', (updatedRuns) => {
-      setActiveRuns(updatedRuns);
-    });
-
-    socket.on('resultsUpdated', (updatedResults) => {
-      setResults(updatedResults);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
+    socket.on('disconnect', () => setConnection('offline'));
+    socket.on('connect_error', () => setConnection('offline'));
+    socket.on('entriesUpdated', setEntries);
+    socket.on('activeRunsUpdated', setActiveRuns);
+    socket.on('resultsUpdated', setResults);
+    return () => { socket.disconnect(); socketRef.current = null; };
   }, []);
 
-  // アクションハンドラ
-  const handleStartRun = (carId) => {
-    if (!carId) return;
-    socket.emit('startRun', { carId });
+  useEffect(() => {
+    if (!notice) return;
+    const timeout = setTimeout(() => setNotice(''), 4000);
+    return () => clearTimeout(timeout);
+  }, [notice]);
+
+  const changeMode = (nextRole) => {
+    setRole(nextRole);
     setSelectedCarId('');
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
-  const handleStopRun = (runId) => {
-    socket.emit('stopRun', runId);
+  // Never buffer timing actions during a disconnection and replay them later.
+  const send = (event, data) => {
+    if (!socketRef.current?.connected || !connected) return false;
+    socketRef.current.emit(event, data);
+    return true;
   };
 
-  const handleCancelRun = (runId) => {
-    socket.emit('cancelRun', runId);
+  const startRun = () => {
+    if (!selectedCarId || activeRuns.some((run) => run.carId === selectedCarId)) return;
+    if (send('startRun', { carId: selectedCarId })) setSelectedCarId('');
   };
 
-  const handleClearResults = () => {
-    if (window.confirm('計測結果ログをすべて削除します。よろしいですか？')) {
-      socket.emit('clearResults');
-    }
-  };
-
-  const handleAddEntry = (e) => {
-    e.preventDefault();
+  const addEntry = (event) => {
+    event.preventDefault();
     if (!newCarNumber.trim() || !newVehicleName.trim()) return;
-    
-    socket.emit('addEntry', {
-      carNumber: newCarNumber.trim(),
-      vehicleName: newVehicleName.trim()
-    });
-
-    setNewCarNumber('');
-    setNewVehicleName('');
-  };
-
-  const handleDeleteEntry = (entryId) => {
-    if (window.confirm('このエントリーを削除してもよろしいですか？')) {
-      socket.emit('deleteEntry', entryId);
+    if (send('addEntry', { carNumber: newCarNumber.trim(), vehicleName: newVehicleName.trim() })) {
+      setNewCarNumber('');
+      setNewVehicleName('');
     }
   };
 
-  const handleExportCSV = () => {
-    if (results.length === 0) return;
-
-    const headers = ['日時', 'カーナンバー', '車両名', 'タイム'];
-    const rows = results.map(r => [
-      new Date(r.timestamp).toLocaleString(),
-      r.carNumber,
-      r.vehicleName,
-      formatTime(r.timeMs)
-    ]);
-    
-    const csvContent = "\uFEFF" + [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `WRC_Timing_Results_${new Date().getTime()}.csv`);
+  const exportCSV = () => {
+    if (!results.length) return;
+    const rows = [['日時', 'カーナンバー', '車両名', 'タイム'], ...results.map((result) => [
+      new Date(result.timestamp).toLocaleString('ja-JP'), result.carNumber, result.vehicleName, formatTime(result.timeMs),
+    ])];
+    const csv = '\uFEFF' + rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Rally_Timing_${Date.now()}.csv`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setNotice('計測結果のCSVを保存しました');
   };
 
-  // 閲覧者用：ソート済み結果
-  const getSortedResults = () => {
-    const list = [...results];
-    if (viewerSortOrder === 'time') {
-      return list.sort((a, b) => a.timeMs - b.timeMs);
-    }
-    return list;
-  };
+  const sortedResults = [...results].sort((a, b) => role === 'viewer' && sortOrder === 'time' ? a.timeMs - b.timeMs : b.timestamp - a.timestamp);
+  const selectedCar = entries.find((entry) => entry.id === selectedCarId);
+  const canStart = connected && selectedCar && !activeRuns.some((run) => run.carId === selectedCarId);
+  const fastest = results.length ? Math.min(...results.map((result) => result.timeMs)) : null;
 
-  // ==========================================
-  // 1. 役割選択画面 (Select Mode)
-  // ==========================================
-  if (!role) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6 selection:bg-orange-500 selection:text-white">
-        <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-orange-900/20 via-slate-950 to-slate-950 pointer-events-none" />
-        
-        <div className="relative bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl p-8 sm:p-10 max-w-lg w-full text-center space-y-8">
-          <div>
-            <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 px-4 py-2 rounded-full text-orange-400 font-extrabold text-sm uppercase tracking-widest mb-5">
-              <Zap size={16} className="animate-pulse" /> Official Timing System
-            </div>
-            <h1 className="text-4xl sm:text-5xl font-black italic tracking-wider uppercase text-white flex items-center justify-center gap-2">
-              <span className="text-orange-500">RALLY</span> TIMING
-            </h1>
-            <p className="text-slate-400 text-sm sm:text-base mt-2 font-medium">担当するモードを選択してください</p>
-          </div>
-          
-          <div className="space-y-4">
-            {/* 1. エントリー管理 */}
-            <button 
-              onClick={() => setRole('entry')}
-              className="w-full py-4.5 px-6 bg-slate-800 hover:bg-slate-700 border border-amber-500/40 text-amber-400 rounded-2xl font-black italic text-base sm:text-lg uppercase tracking-wider transition active:scale-[0.98] flex items-center justify-between"
-            >
-              <span className="flex items-center gap-3"><UserPlus size={22} /> エントリー管理</span>
-              <span className="text-xs sm:text-sm bg-amber-500/20 text-amber-300 px-3 py-1 rounded-md font-mono">EDIT</span>
-            </button>
+  const renderRuns = () => (
+    <section className="panel" aria-labelledby="live-heading">
+      <div className="panel-heading"><div><span className="eyebrow"><i className="status-dot" /> ON STAGE</span><h2 id="live-heading">走行中の車両 <span className="count">{activeRuns.length}</span></h2></div><Radio size={22} className="subtle-icon" /></div>
+      {!activeRuns.length ? <EmptyState icon={Flag} title="スタートを待っています" description={role === 'A' ? '車両を選択して計測を開始してください。' : 'スタートした車両がここに表示されます。'} /> : (
+        <div className="run-grid">{activeRuns.map((run) => (
+          <article className="run-card" key={run.id}>
+            <div className="run-car"><span className="car-number">#{run.carNumber}</span><div><span className="eyebrow">DRIVER / CAR</span><h3>{run.vehicleName}</h3></div><span className="running-label">走行中</span></div>
+            <div className="run-clock"><span className="eyebrow">ELAPSED TIME</span><LiveTimer startTime={run.startTime} /></div>
+            {role !== 'viewer' && <div className="run-actions">
+              {role === 'B' && <button className="button finish-button" disabled={!connected} onClick={() => send('stopRun', run.id)} aria-label={`車両 ${run.carNumber} のフィニッシュを記録`}><Flag size={24} /><span>FINISH <small>ゴールを記録</small></span></button>}
+              <button className="button cancel-button" disabled={!connected} onClick={() => { if (window.confirm(`#${run.carNumber} の計測を取り消しますか？ タイムは記録されません。`)) send('cancelRun', run.id); }} aria-label={`車両 ${run.carNumber} の計測を取り消す`}><X size={18} />計測取消</button>
+            </div>}
+          </article>
+        ))}</div>
+      )}
+    </section>
+  );
 
-            {/* 2. 計測者 A */}
-            <button 
-              onClick={() => setRole('A')}
-              className="w-full py-4.5 px-6 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-2xl font-black italic text-base sm:text-lg uppercase tracking-wider transition active:scale-[0.98] shadow-lg shadow-orange-950/50 flex items-center justify-between"
-            >
-              <span className="flex items-center gap-3"><Play size={22} /> 計測者 A (START)</span>
-              <span className="text-xs sm:text-sm bg-black/30 px-2.5 py-1 rounded font-mono">STAGE IN</span>
-            </button>
-            
-            {/* 3. 計測者 B */}
-            <button 
-              onClick={() => setRole('B')}
-              className="w-full py-4.5 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black italic text-base sm:text-lg uppercase tracking-wider transition active:scale-[0.98] shadow-lg shadow-emerald-950/50 flex items-center justify-between"
-            >
-              <span className="flex items-center gap-3"><Square size={22} /> 計測者 B (FINISH)</span>
-              <span className="text-xs sm:text-sm bg-black/30 px-2.5 py-1 rounded font-mono">STOP</span>
-            </button>
+  const renderResults = () => (
+    <section className="panel" aria-labelledby="results-heading">
+      <div className="panel-heading results-heading"><div><span className="eyebrow">{role === 'viewer' ? 'STAGE CLASSIFICATION' : 'TIMING LOG'}</span><h2 id="results-heading">{role === 'viewer' ? 'ステージリザルト' : '計測ログ'} <span className="count">{results.length}</span></h2></div><div className="toolbar">
+        {role === 'A' && <button className="button text-danger" disabled={!connected || !results.length} onClick={() => { if (window.confirm('計測結果ログをすべて削除します。よろしいですか？')) send('clearResults'); }}><Trash2 size={16} />全件削除</button>}
+        <button className="button secondary-button" disabled={!results.length} onClick={exportCSV}><Download size={17} />CSV保存</button>
+      </div></div>
+      {role === 'viewer' && <div className="results-options"><div className="segmented-control" aria-label="結果の並び順"><button aria-pressed={sortOrder === 'time'} onClick={() => setSortOrder('time')}><Trophy size={16} />タイム順</button><button aria-pressed={sortOrder === 'latest'} onClick={() => setSortOrder('latest')}><ArrowDownUp size={16} />新着順</button></div><span className="eyebrow">TIME / MM:SS.00</span></div>}
+      {!results.length ? <EmptyState icon={Trophy} title="まだ計測結果はありません" description="フィニッシュした車両のタイムがここに表示されます。" /> : (
+        <ol className="result-list">{sortedResults.map((result, index) => (
+          <li className={`result-row ${role === 'viewer' && sortOrder === 'time' && index === 0 ? 'leader' : ''}`} key={result.id}>
+            {role === 'viewer' && sortOrder === 'time' && <span className="position">{String(index + 1).padStart(2, '0')}</span>}
+            <div className="result-car"><span className="result-number">#{result.carNumber}</span><strong>{result.vehicleName}</strong><span className="result-date">{new Date(result.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} フィニッシュ</span></div>
+            <div className="result-time"><strong>{formatTime(result.timeMs)}</strong>{role === 'viewer' && sortOrder === 'time' && <span className={index === 0 ? 'best-label' : 'time-gap'}>{index === 0 ? 'BEST TIME' : `+${formatTime(result.timeMs - fastest)}`}</span>}</div>
+          </li>
+        ))}</ol>
+      )}
+    </section>
+  );
 
-            {/* 4. 閲覧者モード */}
-            <button 
-              onClick={() => setRole('viewer')}
-              className="w-full py-4.5 px-6 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-slate-100 rounded-2xl font-black italic text-base sm:text-lg uppercase tracking-wider transition active:scale-[0.98] flex items-center justify-between group"
-            >
-              <span className="flex items-center gap-3"><Users size={22} className="text-slate-400 group-hover:text-white" /> 閲覧者モード</span>
-              <span className="text-xs sm:text-sm bg-slate-700/50 text-slate-300 px-3 py-1 rounded-md font-mono">LIVE</span>
-            </button>
-          </div>
-
-          <div className="pt-2 text-xs sm:text-sm text-slate-500 font-mono tracking-tight">
-            POWERED BY REALTIME SOCKET ENGINE
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ==========================================
-  // 2. 閲覧者（Viewer）画面
-  // ==========================================
-  if (role === 'viewer') {
-    const sortedResults = getSortedResults();
-
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 pb-12 selection:bg-orange-500 selection:text-white">
-        <header className="bg-slate-900/90 backdrop-blur-md sticky top-0 z-20 border-b border-slate-800 shadow-xl">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-orange-500 p-2 rounded-xl text-slate-950 font-black">
-                <Trophy size={22} />
-              </div>
-              <h1 className="font-black italic text-xl sm:text-2xl tracking-wider text-white uppercase">
-                OFFICIAL <span className="text-orange-500">RESULTS</span>
-              </h1>
-            </div>
-            <button 
-              onClick={() => setRole(null)} 
-              className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl font-bold border border-slate-700 transition"
-            >
-              MODE
-            </button>
-          </div>
-        </header>
-
-        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-          <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-5 bg-slate-900 border-b border-slate-800 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center justify-between sm:justify-start gap-4">
-                <div className="flex items-center gap-2.5">
-                  <Flag size={22} className="text-orange-500" />
-                  <h2 className="font-black italic text-slate-200 tracking-wider uppercase text-base sm:text-lg">STAGE CLASSIFICATION</h2>
-                </div>
-                <span className="text-xs sm:text-sm bg-slate-800 border border-slate-700 text-orange-400 px-3 py-1 rounded-full font-mono font-bold">
-                  {results.length} FINISHED
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between sm:justify-end gap-3">
-                <div className="flex items-center bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs sm:text-sm font-bold flex-1 sm:flex-none justify-center">
-                  <button 
-                    onClick={() => setViewerSortOrder('time')}
-                    className={`flex-1 sm:flex-none px-4 py-2 rounded-lg transition flex items-center justify-center gap-2 ${
-                      viewerSortOrder === 'time' ? 'bg-orange-500 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Trophy size={16} /> FASTEST
-                  </button>
-                  <button 
-                    onClick={() => setViewerSortOrder('latest')}
-                    className={`flex-1 sm:flex-none px-4 py-2 rounded-lg transition flex items-center justify-center gap-2 ${
-                      viewerSortOrder === 'latest' ? 'bg-orange-500 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <ArrowUpDown size={16} /> LATEST
-                  </button>
-                </div>
-
-                <button 
-                  onClick={handleExportCSV}
-                  disabled={results.length === 0}
-                  className="flex items-center gap-1.5 text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-4 py-2.5 rounded-xl transition disabled:opacity-40 font-bold shrink-0"
-                >
-                  <Download size={16} /> CSV
-                </button>
-              </div>
-            </div>
-
-            {/* 表形式 */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[450px]">
-                <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-xs sm:text-sm font-mono uppercase">
-                  <tr>
-                    {viewerSortOrder === 'time' && <th className="py-4 px-5 w-16 text-center">POS</th>}
-                    <th className="py-4 px-5 w-24">NO.</th>
-                    <th className="py-4 px-5">DRIVER / CAR</th>
-                    <th className="py-4 px-5 text-right">STAGE TIME</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {sortedResults.length === 0 ? (
-                    <tr>
-                      <td colSpan={viewerSortOrder === 'time' ? 4 : 3} className="py-14 text-center text-slate-500 text-base font-mono">
-                        NO STAGE TIMES RECORDED
-                      </td>
-                    </tr>
-                  ) : (
-                    sortedResults.map((r, index) => (
-                      <tr key={r.id} className="hover:bg-slate-800/40 transition">
-                        {viewerSortOrder === 'time' && (
-                          <td className="py-4 px-5 font-black italic text-center text-lg sm:text-xl">
-                            {index === 0 ? <span className="text-amber-400">P1</span> : index === 1 ? <span className="text-slate-300">P2</span> : index === 2 ? <span className="text-amber-600">P3</span> : <span className="text-slate-500">P{index + 1}</span>}
-                          </td>
-                        )}
-                        <td className="py-4 px-5">
-                          <span className="bg-amber-400 text-slate-950 font-black italic text-sm sm:text-base px-3 py-1 rounded-md">
-                            #{r.carNumber}
-                          </span>
-                        </td>
-                        <td className="py-4 px-5 font-bold text-slate-200 text-base sm:text-lg">{r.vehicleName}</td>
-                        <td className="py-4 px-5 text-right font-mono font-black italic text-xl sm:text-2xl text-amber-400 tracking-wider">
-                          <div>{formatTime(r.timeMs)}</div>
-                          {viewerSortOrder === 'time' && index > 0 && (
-                            <div className="text-xs sm:text-sm text-rose-400 font-bold not-italic tracking-normal mt-0.5">
-                              +{formatTime(r.timeMs - sortedResults[0].timeMs)}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </main>
-      </div>
-    );
-  }
-
-  // ==========================================
-  // 3. エントリー管理画面 (Entry Mode)
-  // ==========================================
-  if (role === 'entry') {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 pb-12 selection:bg-orange-500 selection:text-white">
-        <header className="bg-slate-900/90 backdrop-blur-md sticky top-0 z-20 border-b border-slate-800 shadow-xl">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-amber-400 p-2 rounded-xl text-slate-950 font-black">
-                <UserPlus size={22} />
-              </div>
-              <h1 className="font-black italic text-xl sm:text-2xl tracking-wider text-white uppercase">
-                ENTRY <span className="text-amber-400">MANAGEMENT</span>
-              </h1>
-            </div>
-            <button 
-              onClick={() => setRole(null)} 
-              className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl font-bold border border-slate-700 transition"
-            >
-              MODE
-            </button>
-          </div>
-        </header>
-
-        <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-          <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-            <div className="p-5 bg-slate-900 border-b border-slate-800">
-              <h2 className="font-black italic text-base sm:text-lg text-slate-200 tracking-wider flex items-center gap-2 uppercase">
-                <Plus size={22} className="text-amber-400" /> REGISTRATION FORM
-              </h2>
-            </div>
-            
-            <form onSubmit={handleAddEntry} className="p-5 flex flex-col sm:flex-row gap-4">
-              <input 
-                type="text" 
-                inputMode="numeric"
-                placeholder="No. (例: 101)" 
-                value={newCarNumber}
-                onChange={e => setNewCarNumber(e.target.value)}
-                className="w-full sm:w-44 px-5 py-3.5 bg-slate-950 border border-slate-700 rounded-xl text-base font-bold text-white placeholder-slate-500 outline-none focus:border-amber-400"
-              />
-              <input 
-                type="text" 
-                placeholder="車両名・チーム名 (DRIVER / CAR)" 
-                value={newVehicleName}
-                onChange={e => setNewVehicleName(e.target.value)}
-                className="flex-1 px-5 py-3.5 bg-slate-950 border border-slate-700 rounded-xl text-base font-bold text-white placeholder-slate-500 outline-none focus:border-amber-400"
-              />
-              <button 
-                type="submit" 
-                disabled={!newCarNumber.trim() || !newVehicleName.trim()} 
-                className="w-full sm:w-auto px-7 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 rounded-xl text-base font-black italic tracking-wider uppercase disabled:opacity-30 transition flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-amber-950/40"
-              >
-                <Plus size={20} /> ADD ENTRY
-              </button>
-            </form>
-          </section>
-
-          <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-            <div className="px-5 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-              <h2 className="font-black italic text-base sm:text-lg text-slate-200 tracking-wider flex items-center gap-2 uppercase">
-                <ClipboardList size={22} className="text-slate-400" /> REGISTERED ENTRIES
-              </h2>
-              <span className="bg-slate-800 border border-slate-700 text-slate-300 text-xs sm:text-sm px-3 py-1 rounded-full font-mono font-bold">
-                {entries.length} ENTRIES
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[450px]">
-                <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-xs sm:text-sm font-mono uppercase">
-                  <tr>
-                    <th className="py-4 px-5 w-28">NO.</th>
-                    <th className="py-4 px-5">DRIVER / CAR</th>
-                    <th className="py-4 px-5 w-28 text-right">ACTION</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {entries.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="py-14 text-center text-slate-500 text-base font-mono">
-                        NO ENTRIES REGISTERED
-                      </td>
-                    </tr>
-                  ) : (
-                    entries.map(entry => (
-                      <tr key={entry.id} className="hover:bg-slate-800/30 transition">
-                        <td className="py-4 px-5">
-                          <span className="bg-amber-400 text-slate-950 font-black italic text-xs sm:text-sm px-3 py-1 rounded-md">
-                            #{entry.carNumber}
-                          </span>
-                        </td>
-                        <td className="py-4 px-5 text-base font-bold text-slate-200">{entry.vehicleName}</td>
-                        <td className="py-4 px-5 text-right">
-                          <button 
-                            onClick={() => handleDeleteEntry(entry.id)}
-                            className="text-xs sm:text-sm text-rose-400 hover:text-rose-300 font-bold px-3.5 py-2 rounded-xl bg-rose-950/40 border border-rose-900/60 transition inline-flex items-center gap-1.5"
-                          >
-                            <Trash2 size={15} /> 削除
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </main>
-      </div>
-    );
-  }
-
-  // ==========================================
-  // 4. 計測者 (A/B) 画面
-  // ==========================================
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-20 selection:bg-orange-500 selection:text-white">
-      {/* ヘッダー */}
-      <header className="bg-slate-900/90 backdrop-blur-md sticky top-0 z-20 border-b border-slate-800 shadow-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Gauge className="text-orange-500 w-6 h-6 sm:w-8 sm:h-8 shrink-0 animate-pulse" />
-            <h1 className="font-black italic text-lg sm:text-2xl tracking-wider text-white uppercase">
-              RALLY <span className="text-orange-500">TIMING</span>
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-black italic tracking-wider ${
-              role === 'A' ? 'bg-orange-500 text-slate-950' : 'bg-emerald-500 text-slate-950'
-            }`}>
-              {role === 'A' ? 'MARSHAL A (START)' : 'MARSHAL B (FINISH)'}
-            </span>
-            <button 
-              onClick={() => setRole(null)} 
-              className="text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-1.5 rounded-xl font-bold border border-slate-700 transition"
-            >
-              MODE
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className={`app ${role ? 'in-mode' : 'home'}`}>
+      <header className="site-header"><div className="header-inner">
+        <button className="brand" onClick={() => changeMode(null)} aria-label="Rally Timing ホームへ"><span className="brand-mark"><span /><span /><span /></span><span>RALLY<span className="brand-light">TIMING</span><small>PRECISION IN EVERY STAGE</small></span></button>
+        <div className={`connection ${connection}`} role="status"><i className="status-dot" /><span>{connected ? 'LIVE 接続中' : connection === 'connecting' ? '接続しています' : '再接続しています'}</span></div>
+        {role && <button className="home-button" onClick={() => changeMode(null)} aria-label="モード選択へ"><LayoutGrid size={19} /><span>モード選択</span></button>}
+      </div></header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
-
-        {/* 【計測者A】スタートコントロールパネル */}
-        {role === 'A' && (
-          <section className="bg-slate-900 border-2 border-orange-500/50 rounded-2xl p-5 sm:p-7 shadow-2xl space-y-4">
-            <div className="flex items-center gap-2.5 text-orange-400">
-              <Play size={22} />
-              <h2 className="font-black italic text-lg sm:text-xl tracking-wider uppercase">START LINE CONTROL</h2>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4">
-              <select 
-                value={selectedCarId} 
-                onChange={(e) => setSelectedCarId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-5 py-4 text-lg font-bold text-white outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
-              >
-                <option value="">-- 発進車両を選択 (SELECT CAR) --</option>
-                {entries.map(e => {
-                  const isRunning = activeRuns.some(r => r.carId === e.id);
-                  return (
-                    <option key={e.id} value={e.id} disabled={isRunning}>
-                      #{e.carNumber} - {e.vehicleName} {isRunning ? ' [ON STAGE]' : ''}
-                    </option>
-                  );
-                })}
-              </select>
-
-              <button 
-                onClick={() => handleStartRun(selectedCarId)}
-                disabled={!selectedCarId}
-                className="w-full sm:w-auto px-9 py-4.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none text-white rounded-xl font-black italic text-xl tracking-wider flex items-center justify-center gap-2.5 transition shadow-xl shadow-orange-950/80 shrink-0"
-              >
-                <Play size={26} /> START STAGE
-              </button>
-            </div>
-          </section>
-        )}
-
-        {/* 【走行中車両（LIVE ON STAGE）- 表形式】 */}
-        <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <div className="px-5 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-            <h2 className="font-black italic text-base sm:text-lg text-slate-200 tracking-wider flex items-center gap-2.5 uppercase">
-              <Flame size={22} className="text-orange-500" /> LIVE ON STAGE
-            </h2>
-            <span className="bg-orange-500/20 border border-orange-500/40 text-orange-400 text-xs sm:text-sm font-mono font-bold px-3 py-1 rounded-full">
-              {activeRuns.length} CARS
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[580px]">
-              <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-xs sm:text-sm font-mono uppercase">
-                <tr>
-                  <th className="py-4 px-5 w-24">NO.</th>
-                  <th className="py-4 px-5">DRIVER / CAR</th>
-                  <th className="py-4 px-5 w-44">LIVE TIME</th>
-                  <th className="py-4 px-5 text-right w-44">ACTION</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {activeRuns.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-12 text-center text-slate-500 text-base font-mono">
-                      NO CARS ON STAGE
-                    </td>
-                  </tr>
-                ) : (
-                  activeRuns.map(run => (
-                    <tr key={run.id} className="hover:bg-slate-800/30 transition">
-                      <td className="py-5 px-5">
-                        <span className="bg-amber-400 text-slate-950 font-black italic text-sm sm:text-base px-3 py-1.5 rounded-md">
-                          #{run.carNumber}
-                        </span>
-                      </td>
-                      <td className="py-5 px-5 font-bold text-slate-200 text-base sm:text-lg">{run.vehicleName}</td>
-                      <td className="py-5 px-5">
-                        <LiveTimer startTime={run.startTime} />
-                      </td>
-                      <td className="py-5 px-5 text-right">
-                        <div className="flex items-center justify-end gap-3">
-                          {role === 'B' && (
-                            <button 
-                              onClick={() => handleStopRun(run.id)}
-                              className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.97] text-white rounded-xl font-black italic text-base sm:text-lg tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-950/80 transition my-1"
-                            >
-                              <Square size={20} /> FINISH
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => handleCancelRun(run.id)}
-                            className="text-xs text-rose-400 hover:text-rose-300 font-bold p-1.5 rounded transition"
-                            title="キャンセル"
-                          >
-                            <XCircle size={22} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* 【計測結果ログ - 表形式】 */}
-        <section className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <div className="px-5 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-            <h2 className="font-black italic text-base sm:text-lg text-slate-200 tracking-wider flex items-center gap-2.5 uppercase">
-              <Save size={22} className="text-slate-400" /> TIMING LOGS
-            </h2>
-            <div className="flex items-center gap-3">
-              {role === 'A' && (
-                <button 
-                  onClick={handleClearResults}
-                  disabled={results.length === 0}
-                  className="flex items-center gap-1.5 text-xs sm:text-sm bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/60 text-rose-300 px-3.5 py-2 rounded-xl transition disabled:opacity-30 font-bold"
-                >
-                  <Trash2 size={16} /> CLEAR LOG
-                </button>
-              )}
-              <button 
-                onClick={handleExportCSV}
-                disabled={results.length === 0}
-                className="flex items-center gap-1.5 text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3.5 py-2 rounded-xl transition disabled:opacity-30 font-bold"
-              >
-                <Download size={16} /> CSV
-              </button>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[450px]">
-              <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-xs sm:text-sm font-mono uppercase">
-                <tr>
-                  <th className="py-4 px-5 w-24">NO.</th>
-                  <th className="py-4 px-5">DRIVER / CAR</th>
-                  <th className="py-4 px-5 text-right">STAGE TIME</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {results.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="py-12 text-center text-slate-500 text-base font-mono">
-                      NO TIMING LOGS
-                    </td>
-                  </tr>
-                ) : (
-                  results.map(r => (
-                    <tr key={r.id} className="hover:bg-slate-800/30 transition">
-                      <td className="py-4 px-5">
-                        <span className="bg-amber-400 text-slate-950 font-black italic text-xs sm:text-sm px-3 py-1 rounded-md">
-                          #{r.carNumber}
-                        </span>
-                      </td>
-                      <td className="py-4 px-5 font-bold text-slate-200 text-base sm:text-lg">{r.vehicleName}</td>
-                      <td className="py-4 px-5 text-right font-mono font-black italic text-xl sm:text-2xl text-amber-400 tracking-wider">
-                        {formatTime(r.timeMs)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
+      <main className="main-content" id="main">
+        {connection === 'offline' && <div className="connection-banner" role="status"><Radio size={18} /><span>サーバーへの接続を待っています。接続が戻ると、計測・登録を操作できます。</span></div>}
+        {!role ? <>
+          <section className="hero"><div className="hero-copy"><span className="eyebrow hero-kicker"><span /> RALLY STAGE TIMING</span><h1>CHASE THE<br /><em>SECONDS.</em></h1><p className="hero-japanese">その一瞬を、記録する。</p><p className="hero-description">スタートからフィニッシュまで。<br />すべてのタイムを、ひとつにつなぐ。</p><div className="hero-bottom"><span className="mini-rule" /> READY FOR THE NEXT STAGE</div></div><StageGraphic /></section>
+          <section className="session-stats" aria-label="計測状況"><div><Users size={19} /><span>エントリー<small>ENTRIES</small></span><strong>{String(entries.length).padStart(2, '0')}</strong></div><div><Radio size={19} /><span>走行中<small>ON STAGE</small></span><strong className="orange-text">{String(activeRuns.length).padStart(2, '0')}</strong></div><div><Flag size={19} /><span>計測完了<small>FINISHED</small></span><strong>{String(results.length).padStart(2, '0')}</strong></div></section>
+          <section className="mode-section" aria-labelledby="mode-heading"><div className="section-title"><div><span className="eyebrow">YOUR POSITION. YOUR CONTROL.</span><h2 id="mode-heading">担当するモードを選択</h2></div><span className="section-index">01 — 04</span></div><div className="mode-grid">{MODES.map((mode, index) => {
+            const Icon = mode.icon;
+            return <button key={mode.id} className={`mode-card ${mode.tone}`} onClick={() => changeMode(mode.id)}><div className="mode-card-top"><Icon size={26} strokeWidth={1.6} /><span>0{index + 1}</span></div><span className="mode-tag">{mode.tag}</span><h3>{mode.english}</h3><strong>{mode.title}</strong><p>{mode.description}</p><span className="mode-card-bottom">モードを開く<ArrowRight size={20} /></span></button>;
+          })}</div></section>
+          <div className="home-note"><Radio size={16} /><span>各端末の計測データをリアルタイムで共有</span><span className="note-rule" /><span className="eyebrow">BUILT FOR THE STAGE.</span></div>
+        </> : <>
+          <div className="page-heading"><div><span className="eyebrow orange-text">{currentMode.tag} <ChevronRight size={12} /> {currentMode.english}</span><h1>{currentMode.title}</h1><p>{role === 'A' ? '車両を選択し、スタートの瞬間にタップ。' : role === 'B' ? '車両番号を確認し、ゴールの瞬間にタップ。' : role === 'viewer' ? 'ステージの動きを、リアルタイムで。' : '計測する車両を、事前に登録。'}</p></div><span className={`page-icon ${currentMode.tone}`}><currentMode.icon size={30} strokeWidth={1.5} /></span></div>
+          {role === 'entry' ? <div className="entry-layout">
+            <section className="panel entry-form-panel"><div className="panel-heading"><div><span className="eyebrow">NEW ENTRY</span><h2>車両を登録</h2></div><Plus size={22} className="subtle-icon" /></div><form onSubmit={addEntry} className="entry-form"><label htmlFor="car-number">車両番号 <span>CAR NO.</span></label><input id="car-number" inputMode="numeric" placeholder="例：101" required value={newCarNumber} onChange={(event) => setNewCarNumber(event.target.value)} /><label htmlFor="vehicle-name">車両名・チーム名 <span>DRIVER / CAR</span></label><input id="vehicle-name" placeholder="例：GR YARIS / Rally Team" required value={newVehicleName} onChange={(event) => setNewVehicleName(event.target.value)} /><button className="button primary-button" disabled={!connected || !newCarNumber.trim() || !newVehicleName.trim()}><Plus size={21} />エントリーを追加</button><p className="form-hint">登録した車両は、スタート画面で選択できます。</p></form></section>
+            <section className="panel"><div className="panel-heading"><div><span className="eyebrow">REGISTERED CARS</span><h2>エントリーリスト <span className="count">{entries.length}</span></h2></div><Users size={22} className="subtle-icon" /></div>{!entries.length ? <EmptyState icon={Users} title="車両を登録しましょう" description="車両番号と車両名を入力して追加してください。" /> : <ul className="entry-list">{entries.map((entry) => <li key={entry.id}><span className="car-number">#{entry.carNumber}</span><strong>{entry.vehicleName}</strong><button className="button icon-button text-danger" aria-label={`車両 ${entry.carNumber} を削除`} disabled={!connected || activeRuns.some((run) => run.carId === entry.id)} onClick={() => { if (window.confirm(`#${entry.carNumber} のエントリーを削除しますか？`)) send('deleteEntry', entry.id); }}><Trash2 size={19} /></button></li>)}</ul>}</section>
+          </div> : <div className="timing-layout">
+            {role === 'A' && <section className="panel start-panel"><div className="panel-heading"><div><span className="eyebrow orange-text">START CONTROL</span><h2>次のスタート車両</h2></div><Timer size={23} className="orange-text" /></div><div className="start-controls"><label htmlFor="start-car">車両を選択</label><select id="start-car" value={selectedCarId} onChange={(event) => setSelectedCarId(event.target.value)}><option value="">車両番号・車両名を選択</option>{entries.map((entry) => <option key={entry.id} value={entry.id} disabled={activeRuns.some((run) => run.carId === entry.id)}>#{entry.carNumber} — {entry.vehicleName}{activeRuns.some((run) => run.carId === entry.id) ? '（走行中）' : ''}</option>)}</select><div className="start-preview">{selectedCar ? <><span className="car-number">#{selectedCar.carNumber}</span><strong>{selectedCar.vehicleName}</strong></> : <><Flag size={24} /><span>スタートする車両を選んでください</span></>}</div><button className="button primary-button start-button" onClick={startRun} disabled={!canStart}><Timer size={28} /><span>START<small>計測を開始</small></span><ArrowRight size={23} /></button>{!entries.length && <button className="inline-link" onClick={() => changeMode('entry')}>まずは車両を登録<ArrowRight size={16} /></button>}</div></section>}
+            <div className="timing-content">{role === 'viewer' ? <>{renderResults()}{renderRuns()}</> : <>{renderRuns()}{renderResults()}</>}</div>
+          </div>}
+        </>}
       </main>
+      <footer className="site-footer"><span>RALLY TIMING<span className="footer-slash"> /// </span>STAGE CONTROL</span><span>1/100 SEC. DISPLAY</span></footer>
+      {role && <nav className="bottom-nav" aria-label="担当モード">{MODES.map((mode) => { const Icon = mode.icon; return <button key={mode.id} aria-current={role === mode.id ? 'page' : undefined} onClick={() => changeMode(mode.id)}><Icon size={21} /><span>{mode.short}</span></button>; })}</nav>}
+      {notice && <div className="toast" role="status"><Check size={18} />{notice}</div>}
     </div>
   );
 }

@@ -1,16 +1,46 @@
-# React + Vite
+# RALLY TIMING
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite のラリー計測アプリです。Socket.IO を使い、スタート担当・フィニッシュ担当・閲覧者の端末間で車両と計測結果を共有します。
 
-Currently, two official plugins are available:
+## 起動
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```sh
+npm install
+npm run dev
+```
 
-## React Compiler
+同じ Wi-Fi に接続したスマートフォンで確認する場合：
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```sh
+npm run dev -- --host 0.0.0.0
+```
 
-## Expanding the ESLint configuration
+Vite が表示する Network の URL をスマートフォンで開きます。
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 操作
+
+1. 「エントリー管理」で車両番号と車両名を登録します。
+2. スタート担当が「スタート計測」で車両を選び、START を押します。
+3. フィニッシュ担当が該当車両の FINISH を押します。
+4. 「リザルト」でタイム順・新着順を切り替え、CSV を保存できます。
+
+計測取消・削除には確認画面が表示されます。通信が切れている間は計測・登録操作を無効にし、再接続時にサーバーのデータを取得します。計測時間の確定は既存のサーバー側で行います。
+
+## 接続先
+
+既定では既存の Render サーバーに接続します。ローカルのバックエンドを使う場合は `.env.local` に接続先を設定し、Vite を再起動します。
+
+```dotenv
+VITE_SOCKET_SERVER_URL=http://localhost:10000
+```
+
+スマートフォンからローカルのバックエンドに接続する場合は、`localhost` をバックエンドが動いている PC の LAN アドレスに置き換えてください。
+
+## チェック・ビルド
+
+```sh
+npm run lint
+npm run build
+```
+
+出力先は `dist/` です。表示用のタイムは 1/100 秒単位です。データの保存方式と保持期間は接続先サーバーに依存します。
