@@ -200,14 +200,16 @@ export default function App() {
           </div>
           
           <div className="space-y-4">
+            {/* 1. エントリー管理 */}
             <button 
-              onClick={() => setRole('viewer')}
-              className="w-full py-4.5 px-6 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-slate-100 rounded-2xl font-black italic text-base sm:text-lg uppercase tracking-wider transition active:scale-[0.98] flex items-center justify-between group"
+              onClick={() => setRole('entry')}
+              className="w-full py-4.5 px-6 bg-slate-800 hover:bg-slate-700 border border-amber-500/40 text-amber-400 rounded-2xl font-black italic text-base sm:text-lg uppercase tracking-wider transition active:scale-[0.98] flex items-center justify-between"
             >
-              <span className="flex items-center gap-3"><Users size={22} className="text-slate-400 group-hover:text-white" /> 閲覧者モード</span>
-              <span className="text-xs sm:text-sm bg-slate-700/50 text-slate-300 px-3 py-1 rounded-md font-mono">LIVE</span>
+              <span className="flex items-center gap-3"><UserPlus size={22} /> エントリー管理</span>
+              <span className="text-xs sm:text-sm bg-amber-500/20 text-amber-300 px-3 py-1 rounded-md font-mono">EDIT</span>
             </button>
-            
+
+            {/* 2. 計測者 A */}
             <button 
               onClick={() => setRole('A')}
               className="w-full py-4.5 px-6 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-2xl font-black italic text-base sm:text-lg uppercase tracking-wider transition active:scale-[0.98] shadow-lg shadow-orange-950/50 flex items-center justify-between"
@@ -216,6 +218,7 @@ export default function App() {
               <span className="text-xs sm:text-sm bg-black/30 px-2.5 py-1 rounded font-mono">STAGE IN</span>
             </button>
             
+            {/* 3. 計測者 B */}
             <button 
               onClick={() => setRole('B')}
               className="w-full py-4.5 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black italic text-base sm:text-lg uppercase tracking-wider transition active:scale-[0.98] shadow-lg shadow-emerald-950/50 flex items-center justify-between"
@@ -224,12 +227,13 @@ export default function App() {
               <span className="text-xs sm:text-sm bg-black/30 px-2.5 py-1 rounded font-mono">STOP</span>
             </button>
 
+            {/* 4. 閲覧者モード */}
             <button 
-              onClick={() => setRole('entry')}
-              className="w-full py-4.5 px-6 bg-slate-800 hover:bg-slate-700 border border-amber-500/40 text-amber-400 rounded-2xl font-black italic text-base sm:text-lg uppercase tracking-wider transition active:scale-[0.98] flex items-center justify-between"
+              onClick={() => setRole('viewer')}
+              className="w-full py-4.5 px-6 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 text-slate-100 rounded-2xl font-black italic text-base sm:text-lg uppercase tracking-wider transition active:scale-[0.98] flex items-center justify-between group"
             >
-              <span className="flex items-center gap-3"><UserPlus size={22} /> エントリー管理</span>
-              <span className="text-xs sm:text-sm bg-amber-500/20 text-amber-300 px-3 py-1 rounded-md font-mono">EDIT</span>
+              <span className="flex items-center gap-3"><Users size={22} className="text-slate-400 group-hover:text-white" /> 閲覧者モード</span>
+              <span className="text-xs sm:text-sm bg-slate-700/50 text-slate-300 px-3 py-1 rounded-md font-mono">LIVE</span>
             </button>
           </div>
 
@@ -313,20 +317,19 @@ export default function App() {
 
             {/* 表形式 */}
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[550px]">
+              <table className="w-full text-left border-collapse min-w-[450px]">
                 <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-xs sm:text-sm font-mono uppercase">
                   <tr>
                     {viewerSortOrder === 'time' && <th className="py-4 px-5 w-16 text-center">POS</th>}
                     <th className="py-4 px-5 w-24">NO.</th>
                     <th className="py-4 px-5">DRIVER / CAR</th>
-                    <th className="py-4 px-5 w-32">PASS TIME</th>
                     <th className="py-4 px-5 text-right">STAGE TIME</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
                   {sortedResults.length === 0 ? (
                     <tr>
-                      <td colSpan={viewerSortOrder === 'time' ? 5 : 4} className="py-14 text-center text-slate-500 text-base font-mono">
+                      <td colSpan={viewerSortOrder === 'time' ? 4 : 3} className="py-14 text-center text-slate-500 text-base font-mono">
                         NO STAGE TIMES RECORDED
                       </td>
                     </tr>
@@ -344,11 +347,13 @@ export default function App() {
                           </span>
                         </td>
                         <td className="py-4 px-5 font-bold text-slate-200 text-base sm:text-lg">{r.vehicleName}</td>
-                        <td className="py-4 px-5 text-xs sm:text-sm text-slate-500 font-mono">
-                          {new Date(r.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}
-                        </td>
                         <td className="py-4 px-5 text-right font-mono font-black italic text-xl sm:text-2xl text-amber-400 tracking-wider">
-                          {formatTime(r.timeMs)}
+                          <div>{formatTime(r.timeMs)}</div>
+                          {viewerSortOrder === 'time' && index > 0 && (
+                            <div className="text-xs sm:text-sm text-rose-400 font-bold not-italic tracking-normal mt-0.5">
+                              +{formatTime(r.timeMs - sortedResults[0].timeMs)}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -638,19 +643,18 @@ export default function App() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[550px]">
+            <table className="w-full text-left border-collapse min-w-[450px]">
               <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 text-xs sm:text-sm font-mono uppercase">
                 <tr>
                   <th className="py-4 px-5 w-24">NO.</th>
                   <th className="py-4 px-5">DRIVER / CAR</th>
-                  <th className="py-4 px-5 w-32">PASS TIME</th>
                   <th className="py-4 px-5 text-right">STAGE TIME</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
                 {results.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-12 text-center text-slate-500 text-base font-mono">
+                    <td colSpan={3} className="py-12 text-center text-slate-500 text-base font-mono">
                       NO TIMING LOGS
                     </td>
                   </tr>
@@ -663,9 +667,6 @@ export default function App() {
                         </span>
                       </td>
                       <td className="py-4 px-5 font-bold text-slate-200 text-base sm:text-lg">{r.vehicleName}</td>
-                      <td className="py-4 px-5 text-xs sm:text-sm text-slate-500 font-mono">
-                        {new Date(r.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}
-                      </td>
                       <td className="py-4 px-5 text-right font-mono font-black italic text-xl sm:text-2xl text-amber-400 tracking-wider">
                         {formatTime(r.timeMs)}
                       </td>
