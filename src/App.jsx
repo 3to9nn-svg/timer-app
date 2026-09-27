@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { ArrowDownUp, ArrowRight, Check, ChevronRight, Download, Eye, EyeOff, Flag, LayoutGrid, LockKeyhole, LogOut, Plus, Radio, Timer, Trash2, Trophy, Users, X } from 'lucide-react';
+import { ArrowDownUp, ArrowRight, Check, ChevronDown, ChevronRight, Download, Eye, EyeOff, Flag, LockKeyhole, LogOut, Plus, Radio, SlidersHorizontal, Timer, Trash2, Trophy, Users, X } from 'lucide-react';
 import './App.css';
 import { EventControl } from './EventControl';
+import { ModeMenu } from './ModeMenu';
 
 const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'https://timer-server-qf32.onrender.com/';
 const SESSION_KEY = 'rally-timing-session';
@@ -73,6 +74,9 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [role, setRole] = useState(null);
   const [sortOrder, setSortOrder] = useState('time');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [viewerRunsOpen, setViewerRunsOpen] = useState(false);
   const [entries, setEntries] = useState([]);
   const [activeRuns, setActiveRuns] = useState([]);
   const [results, setResults] = useState([]);
@@ -347,7 +351,8 @@ export default function App() {
 
   const renderRuns = () => (
     <section className="panel" aria-labelledby="live-heading">
-      <div className="panel-heading"><div><span className="eyebrow"><i className="status-dot" /> ON STAGE</span><h2 id="live-heading">走行中の車両 <span className="count">{viewedRuns.length}</span></h2></div><Radio size={22} className="subtle-icon" /></div>
+      <div className="panel-heading"><div><span className="eyebrow"><i className="status-dot" /> ON STAGE</span><h2 id="live-heading">走行中の車両 <span className="count">{viewedRuns.length}</span></h2></div>{role === 'viewer' ? <button className="button secondary-button disclosure-button" aria-label="走行状況の表示切替" aria-expanded={viewerRunsOpen} aria-controls="live-content" onClick={() => setViewerRunsOpen(value => !value)}>{viewerRunsOpen ? '閉じる' : '表示'}<ChevronDown size={18} /></button> : <Radio size={22} className="subtle-icon" />}</div>
+      <div id="live-content" hidden={role === 'viewer' && !viewerRunsOpen}>
       {!viewedRuns.length ? <EmptyState icon={Flag} title={(role === 'viewer' ? viewedEvent : currentEvent)?.status === 'ended' ? 'このイベントは終了しました' : 'スタートを待っています'} description={role === 'A' ? '開催中のイベントで車両を選択して計測を開始してください。' : '走行中の車両がここに表示されます。'} /> : (
         <div className="run-grid">{viewedRuns.map((run) => (
           <article className="run-card" key={run.id}>
@@ -360,21 +365,24 @@ export default function App() {
           </article>
         ))}</div>
       )}
+      </div>
     </section>
   );
 
   const renderResults = () => (
     <section className="panel" aria-labelledby="results-heading">
       <div className="panel-heading results-heading"><div><span className="eyebrow">{role === 'viewer' ? 'STAGE CLASSIFICATION' : 'TIMING LOG'}</span><h2 id="results-heading">{role === 'viewer' ? 'ステージリザルト' : '計測ログ'} <span className="count">{sortedResults.length}</span></h2></div><div className="toolbar">
+        {role === 'viewer' ? <button className="button secondary-button disclosure-button" aria-expanded={filtersOpen} aria-controls="result-filters" onClick={() => setFiltersOpen(value => !value)}><SlidersHorizontal size={17} />フィルター{(archive || resultCarNumber) && <span className="filter-indicator" aria-label="絞り込み中" />}<ChevronDown size={16} /></button> : <button className="button secondary-button disclosure-button" aria-label="計測ログの表示切替" aria-expanded={logsOpen} aria-controls="results-content" onClick={() => setLogsOpen(value => !value)}>{logsOpen ? '閉じる' : '表示'}<ChevronDown size={18} /></button>}
         <button className="button secondary-button" disabled={!sortedResults.length || (role === 'viewer' && archive && !archive.event)} onClick={exportCSV}><Download size={17} />CSV保存</button>
       </div></div>
+      <div id="results-content" hidden={role !== 'viewer' && !logsOpen}>
       {role === 'viewer' && <>
-        <div className="results-filters">
+        <div className="results-filters" id="result-filters" hidden={!filtersOpen}>
           <div><label htmlFor="result-event">イベント</label><select id="result-event" value={archive?.id || ''} onChange={e => selectArchive(e.target.value)} disabled={!connected}><option value="">{currentEvent ? `${currentEvent.name}（${currentEvent.status === 'active' ? '開催中' : '終了'}）` : 'イベント未開始'}</option>{events.filter(event => event.id !== currentEvent?.id).map(event => <option key={event.id} value={event.id}>{event.name}（{new Date(event.startedAt).toLocaleDateString('ja-JP')}・終了）</option>)}</select></div>
           <div><label htmlFor="result-car-filter">カーナンバー</label><select id="result-car-filter" value={resultCarNumber} onChange={e => setResultCarNumber(e.target.value)} disabled={Boolean(archive && !archive.event)}><option value="">すべての車両</option>{carNumbers.map(number => <option key={number} value={number}>#{number}</option>)}</select></div>
         </div>
         <div className="results-options"><div className="segmented-control" aria-label="結果の並び順"><button aria-pressed={sortOrder === 'time'} onClick={() => setSortOrder('time')}><Trophy size={16} />タイム順</button><button aria-pressed={sortOrder === 'latest'} onClick={() => setSortOrder('latest')}><ArrowDownUp size={16} />新着順</button></div><span className="eyebrow">TIME / MM:SS.00</span></div>
-        <p className="results-scope">{resultCarNumber ? `#${resultCarNumber} の全走行` : 'すべての車両の走行'} · {sortedResults.length}件{sortOrder === 'time' && ' · 差は表示中のベストタイム基準'}</p>
+        <p className="results-scope">{archive && `${viewedEvent?.name || '過去のイベント'} · `}{resultCarNumber ? `#${resultCarNumber} の全走行` : 'すべての車両の走行'} · {sortedResults.length}件{sortOrder === 'time' && ' · 差は表示中のベストタイム基準'}</p>
       </>}
       {role === 'viewer' && archive && !archive.event ? <div className="archive-status" role="status"><p>{archive.error || '過去の記録を読み込んでいます…'}</p>{archive.error && <button className="button secondary-button" disabled={!connected} onClick={() => selectArchive(archive.id)}>再試行</button>}</div> : !sortedResults.length ? <EmptyState icon={Trophy} title={resultCarNumber && role === 'viewer' ? 'この車両の計測結果はありません' : 'まだ計測結果はありません'} description="フィニッシュした車両のタイムがここに表示されます。" /> : (
         <ol className={`result-list ${role === 'viewer' && sortOrder === 'time' ? 'ranked-results' : ''}`}>{sortedResults.map((result, index) => (
@@ -385,24 +393,26 @@ export default function App() {
           </li>
         ))}</ol>
       )}
+      </div>
     </section>
   );
 
   return (
-    <div className={`app ${role ? 'in-mode' : 'home'}`}>
+    <div className={`app ${role ? 'in-mode' : 'home'} ${role === 'viewer' ? 'viewer-mode' : ''}`}>
       <header className="site-header"><div className="header-inner">
         <button className="brand" onClick={() => changeMode(null)} aria-label="Rally Timing ホームへ"><span className="brand-mark"><span /><span /><span /></span><span>RALLY<span className="brand-light">TIMING</span><small>PRECISION IN EVERY STAGE</small></span></button>
         <div className={`connection ${connection}`} role="status"><i className="status-dot" /><span>{connected ? 'LIVE 接続中' : connection === 'connecting' ? '接続しています' : '再接続しています'}</span></div>
-        {role && <button className="home-button" onClick={() => changeMode(null)} aria-label="モード選択へ"><LayoutGrid size={19} /><span>モード選択</span></button>}
+        <ModeMenu modes={MODES} role={role} onSelect={changeMode} />
       </div></header>
 
       <main className="main-content" id="main">
         {connection === 'offline' && <div className="connection-banner" role="status"><Radio size={18} /><span>サーバーへの接続を待っています。接続が戻ると、計測・登録を操作できます。</span></div>}
         {operationError && <div className="operation-error" role="alert"><span>{operationError}</span><button className="button icon-button" aria-label="エラー表示を閉じる" onClick={() => setOperationError('')}><X size={18} /></button></div>}
-        <div className="event-summary">
+        {role === 'entry' ? <div className="event-summary">
           <div><span className={`event-status ${currentEvent?.status === 'active' ? 'active' : ''}`}>{currentEvent ? currentEvent.status === 'active' ? '開催中' : '終了・記録保存済み' : 'イベント未開始'}</span><strong>{currentEvent?.name || 'イベントを開始してください'}</strong>{currentEvent && <p>開始 {new Date(currentEvent.startedAt).toLocaleString('ja-JP')}{currentEvent.endedAt && ` ／ 終了 ${new Date(currentEvent.endedAt).toLocaleString('ja-JP')}`}</p>}</div>
-          {role !== 'entry' && <button className="button secondary-button" onClick={() => changeMode('entry')}>イベント管理<ChevronRight size={16} /></button>}
-        </div>
+        </div> : <div className="event-strip" title={currentEvent ? `${currentEvent.name}-${currentEvent.status === 'active' ? '開催中' : '終了'}` : 'イベント未開始'}>
+          {currentEvent ? <><span className="event-strip-name">{currentEvent.name}</span><span className={`event-strip-status ${currentEvent.status === 'active' ? 'active' : ''}`}>-{currentEvent.status === 'active' ? '開催中' : '終了'}</span></> : <span>イベント未開始</span>}
+        </div>}
         {!eventSupport && <div className="connection-banner" role="status">イベント保存に対応したサーバーへの更新と、データベースの接続設定が必要です。</div>}
         {!role ? <>
           <section className="hero"><div className="hero-copy"><span className="eyebrow hero-kicker"><span /> RALLY STAGE TIMING</span><h1>CHASE THE<br /><em>SECONDS.</em></h1><p className="hero-japanese">その一瞬を、記録する。</p><p className="hero-description">スタートからフィニッシュまで。<br />すべてのタイムを、ひとつにつなぐ。</p><div className="hero-bottom"><span className="mini-rule" /> READY FOR THE NEXT STAGE</div></div><StageGraphic /></section>
@@ -413,7 +423,7 @@ export default function App() {
           })}</div></section>
           <div className="home-note"><Radio size={16} /><span>各端末の計測データをリアルタイムで共有</span><span className="note-rule" /><span className="eyebrow">BUILT FOR THE STAGE.</span></div>
         </> : <>
-          <div className="page-heading"><div><span className="eyebrow orange-text">{currentMode.tag} <ChevronRight size={12} /> {currentMode.english}</span><h1>{currentMode.title}</h1><p>{role === 'A' ? '車両を選択し、スタートの瞬間にタップ。' : role === 'B' ? '車両番号を確認し、ゴールの瞬間にタップ。' : role === 'viewer' ? 'ステージの動きを、リアルタイムで。' : '計測する車両を、事前に登録。'}</p></div><span className={`page-icon ${currentMode.tone}`}><currentMode.icon size={30} strokeWidth={1.5} /></span></div>
+          <div className="page-heading"><div><span className="eyebrow orange-text">{currentMode.tag} <ChevronRight size={12} /> {currentMode.english}</span><h1>{currentMode.title}</h1><details className="page-help" key={role}><summary>画面の説明<ChevronDown size={16} /></summary><p>{role === 'A' ? '車両を選択し、スタートの瞬間にタップ。' : role === 'B' ? '車両番号を確認し、ゴールの瞬間にタップ。' : role === 'viewer' ? 'ステージの動きを、リアルタイムで。フィルターでイベントや車両を選び、タイム順・新着順を切り替えられます。' : '計測する車両を、事前に登録。'}</p></details></div><span className={`page-icon ${currentMode.tone}`}><currentMode.icon size={30} strokeWidth={1.5} /></span></div>
           {role === 'entry' ? <><EventControl event={currentEvent} name={eventName} onNameChange={setEventName} onStart={startEvent} onEnd={endEvent} connected={connected && eventSupport} pending={eventPending} runningCount={activeRuns.length} /><div className="entry-layout">
             <section className="panel entry-form-panel"><div className="panel-heading"><div><span className="eyebrow">NEW ENTRY</span><h2>車両を登録</h2></div><Plus size={22} className="subtle-icon" /></div><form onSubmit={addEntry} className="entry-form"><label htmlFor="car-number">車両番号 <span>CAR NO.</span></label><input id="car-number" inputMode="numeric" placeholder="例：101" maxLength={20} disabled={!canModify} required value={newCarNumber} onChange={(event) => setNewCarNumber(event.target.value)} /><label htmlFor="vehicle-name">車両名・チーム名 <span>DRIVER / CAR</span></label><input id="vehicle-name" placeholder="例：GR YARIS / Rally Team" maxLength={120} disabled={!canModify} required value={newVehicleName} onChange={(event) => setNewVehicleName(event.target.value)} /><button className="button primary-button" disabled={!canModify || pendingActions.includes('addEntry:') || !newCarNumber.trim() || !newVehicleName.trim()}><Plus size={21} />エントリーを追加</button><p className="form-hint">登録した車両は、スタート画面で選択できます。</p></form></section>
             <section className="panel"><div className="panel-heading"><div><span className="eyebrow">REGISTERED CARS</span><h2>エントリーリスト <span className="count">{entries.length}</span></h2></div><Users size={22} className="subtle-icon" /></div>{!entries.length ? <EmptyState icon={Users} title="車両を登録しましょう" description="車両番号と車両名を入力して追加してください。" /> : <ul className="entry-list">{entries.map((entry) => <li key={entry.id}><span className="car-number">#{entry.carNumber}</span><strong>{entry.vehicleName}</strong><button className="button icon-button text-danger" aria-label={`車両 ${entry.carNumber} を削除`} disabled={!canModify || pendingActions.includes('deleteEntry:') || activeRuns.some((run) => run.carId === entry.id)} onClick={() => { if (window.confirm(`#${entry.carNumber} のエントリーを削除しますか？`)) send('deleteEntry', { entryId: entry.id }); }}><Trash2 size={19} /></button></li>)}</ul>}</section>
