@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { ArrowDownUp, ArrowRight, Check, ChevronDown, ChevronRight, Download, Eye, EyeOff, Flag, LockKeyhole, LogOut, Plus, Radio, SlidersHorizontal, Timer, Trash2, Trophy, Users, X } from 'lucide-react';
+import { ArrowDownUp, ArrowRight, Check, ChevronDown, ChevronRight, Download, Eye, EyeOff, Flag, LockKeyhole, LogOut, Plus, Radio, ShieldCheck, SlidersHorizontal, Timer, Trash2, Trophy, Users, X } from 'lucide-react';
 import './App.css';
 import { EventControl } from './EventControl';
 import { ModeMenu } from './ModeMenu';
+import { AdminMode } from './AdminMode';
+import { RallyControl } from './RallyControl';
 
 const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'https://timer-server-qf32.onrender.com/';
 const SESSION_KEY = 'rally-timing-session';
@@ -21,6 +23,7 @@ const MODES = [
   { id: 'B', tag: 'MARSHAL B', title: 'フィニッシュ計測', short: 'フィニッシュ', english: 'FINISH LINE', description: 'ゴールの瞬間を、ワンタップで記録。', icon: Flag, tone: 'green' },
   { id: 'viewer', tag: 'SPECTATOR', title: 'リザルトを見る', short: 'リザルト', english: 'LIVE RESULTS', description: '走行状況とタイムをリアルタイムに。', icon: Trophy, tone: 'white' },
   { id: 'entry', tag: 'ORGANIZER', title: 'エントリー管理', short: 'エントリー', english: 'ENTRY LIST', description: '参加する車両・チームを登録する。', icon: Users, tone: 'muted' },
+  { id: 'admin', tag: 'ADMINISTRATOR', title: '管理者モード', short: '管理者', english: 'EVENT ARCHIVE', description: '保存済みイベントのCSV保存・削除。', icon: ShieldCheck, tone: 'muted' },
 ];
 
 function formatTime(ms) {
@@ -74,6 +77,11 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [role, setRole] = useState(null);
   const [sortOrder, setSortOrder] = useState('time');
+  const [entrySort, setEntrySort] = useState('added');
+  const [sessionMode, setSessionMode] = useState('free');
+  const [runOrder, setRunOrder] = useState([]);
+  const [orderRevision, setOrderRevision] = useState(0);
+  const [capabilities, setCapabilities] = useState({});
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [viewerRunsOpen, setViewerRunsOpen] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
@@ -96,6 +104,7 @@ export default function App() {
   const [newVehicleName, setNewVehicleName] = useState('');
   const [notice, setNotice] = useState('');
   const socketRef = useRef(null);
+  const [socketClient, setSocketClient] = useState(null);
   const accessGrantedRef = useRef(false);
   const connected = connection === 'connected';
   const currentMode = MODES.find((mode) => mode.id === role);
@@ -114,6 +123,11 @@ export default function App() {
     setShowPassword(false);
     setRole(null);
     setEntries([]);
+    setEntrySort('added');
+    setSessionMode('free');
+    setRunOrder([]);
+    setOrderRevision(0);
+    setCapabilities({});
     setActiveRuns([]);
     setResults([]);
     setCurrentEvent(null);
@@ -147,6 +161,11 @@ export default function App() {
       }
       lastEventId = nextEventId;
       setEntries(data.entries || []);
+      setSessionMode(data.sessionMode || 'free');
+      setRunOrder(data.runOrder || []);
+      setOrderRevision(data.orderRevision || 0);
+      setCapabilities(data.capabilities || {});
+      setArchive(previous => previous && !data.events?.some(event => event.id === previous.id) ? null : previous);
       setActiveRuns(data.activeRuns || []);
       setResults(data.results || []);
       setCurrentEvent(data.currentEvent || null);
@@ -166,6 +185,7 @@ export default function App() {
         return;
       }
       accessGrantedRef.current = true;
+      setSocketClient(socket);
       setAccessState('granted');
       setLoginError('');
       updateState(data);
@@ -277,8 +297,8 @@ export default function App() {
   };
 
   const startRun = async () => {
-    if (!selectedCarId || activeRuns.some((run) => run.carId === selectedCarId)) return;
-    if (await send('startRun', { carId: selectedCarId })) setSelectedCarId('');
+    if (!canStart) return;
+    if (await send('startRun', { carId: selectedCar.id, ...(sessionMode === 'rally' ? { orderItemId: nextOrder.id, orderRevision } : {}) })) setSelectedCarId('');
   };
 
   const addEntry = async (event) => {
@@ -343,11 +363,32 @@ export default function App() {
   const carNumbers = [...new Set([...viewedEntries, ...viewedResults].map(item => item.carNumber))].sort((a, b) => a.localeCompare(b, 'ja', { numeric: true }));
   const sortedResults = viewedResults.filter(result => role !== 'viewer' || !resultCarNumber || result.carNumber === resultCarNumber)
     .sort((a, b) => role === 'viewer' && sortOrder === 'time' ? a.timeMs - b.timeMs || b.timestamp - a.timestamp : b.timestamp - a.timestamp);
-  const selectedCar = entries.find((entry) => entry.id === selectedCarId);
+  const numberEntries = [...entries].sort((a, b) => a.carNumber.localeCompare(b.carNumber, 'ja', { numeric: true }) || a.vehicleName.localeCompare(b.vehicleName, 'ja'));
+  const displayEntries = entrySort === 'number' ? numberEntries : entrySort === 'name' ? [...entries].sort((a, b) => a.vehicleName.localeCompare(b.vehicleName, 'ja', { numeric: true }) || a.carNumber.localeCompare(b.carNumber, 'ja', { numeric: true })) : entries;
+  const nextOrder = runOrder.find(item => item.status === 'pending');
+  const selectedCar = entries.find((entry) => entry.id === (sessionMode === 'rally' ? nextOrder?.carId : selectedCarId));
   const canModify = connected && currentEvent?.status === 'active';
   const eventPending = pendingActions.some(key => key.startsWith('startEvent:') || key.startsWith('endEvent:'));
-  const canStart = canModify && !pendingActions.some(key => key.startsWith('startRun:')) && selectedCar && !activeRuns.some((run) => run.carId === selectedCarId);
+  const orderPending = pendingActions.some(key => /^(startRun|setSessionMode|appendRunOrder|editRunOrder):/.test(key));
+  const canStart = canModify && !orderPending && selectedCar && !activeRuns.some((run) => run.carId === selectedCar.id);
   const fastest = sortedResults.length ? Math.min(...sortedResults.map((result) => result.timeMs)) : null;
+
+  const renderStartPanel = () => <section className="panel start-panel">
+    <div className="panel-heading"><div><span className="eyebrow orange-text">START CONTROL</span><h2>次のスタート車両</h2></div><Timer size={23} className="orange-text" /></div>
+    <div className="start-controls">
+      <label htmlFor="session-mode">セッション</label>
+      <select id="session-mode" value={sessionMode} disabled={!canModify || !capabilities.sessions || orderPending || activeRuns.length > 0} onChange={e => send('setSessionMode', { mode: e.target.value, orderRevision })}>
+        <option value="free">フリーランセッション</option><option value="rally">ラリーセッション</option>
+      </select>
+      {!capabilities.sessions && <p className="form-hint">ラリーセッションにはサーバーの更新が必要です。</p>}
+      {activeRuns.length > 0 && <p className="form-hint">走行中はセッションを切り替えられません。</p>}
+      {sessionMode === 'free' ? <><label htmlFor="start-car">車両を選択</label><select id="start-car" disabled={!canModify || orderPending} value={selectedCarId} onChange={e => setSelectedCarId(e.target.value)}><option value="">車両番号・車両名を選択</option>{numberEntries.map(entry => <option key={entry.id} value={entry.id} disabled={activeRuns.some(run => run.carId === entry.id)}>#{entry.carNumber} — {entry.vehicleName}{activeRuns.some(run => run.carId === entry.id) ? '（走行中）' : ''}</option>)}</select></> : <p className="form-hint">ランオーダーの先頭車両をスタートします。</p>}
+      <div className="start-preview">{selectedCar ? <><span className="car-number">#{selectedCar.carNumber}</span><strong>{selectedCar.vehicleName}</strong></> : <><Flag size={24} /><span>{sessionMode === 'rally' ? 'ランオーダーに車両を追加してください' : 'スタートする車両を選んでください'}</span></>}</div>
+      <button className="button primary-button start-button" onClick={startRun} disabled={!canStart}><Timer size={28} /><span>START<small>{orderPending ? '保存しています…' : '計測を開始'}</small></span><ArrowRight size={23} /></button>
+      {sessionMode === 'rally' && nextOrder && <><button className="button secondary-button" disabled={!canModify || orderPending} onClick={() => send('editRunOrder', { itemId: nextOrder.id, action: 'skip', orderRevision })}>次の車両 #{nextOrder.carNumber} をスキップ</button>{activeRuns.some(run => run.carId === nextOrder.carId) && <p className="form-hint">次の車両は走行中です。フィニッシュを待つか、スキップ・並べ替えをしてください。</p>}</>}
+      {!entries.length && <button className="inline-link" onClick={() => changeMode('entry')}>まずは車両を登録<ArrowRight size={16} /></button>}
+    </div>
+  </section>;
 
   const renderRuns = () => (
     <section className="panel" aria-labelledby="live-heading">
@@ -418,19 +459,19 @@ export default function App() {
         {!role ? <>
           <section className="hero"><div className="hero-copy"><span className="eyebrow hero-kicker"><span /> RALLY STAGE TIMING</span><h1>CHASE THE<br /><em>SECONDS.</em></h1><p className="hero-japanese">その一瞬を、記録する。</p><p className="hero-description">スタートからフィニッシュまで。<br />すべてのタイムを、ひとつにつなぐ。</p><div className="hero-bottom"><span className="mini-rule" /> READY FOR THE NEXT STAGE</div></div><StageGraphic /></section>
           <section className="session-stats" aria-label="計測状況"><div><Users size={19} /><span>エントリー<small>ENTRIES</small></span><strong>{String(entries.length).padStart(2, '0')}</strong></div><div><Radio size={19} /><span>走行中<small>ON STAGE</small></span><strong className="orange-text">{String(activeRuns.length).padStart(2, '0')}</strong></div><div><Flag size={19} /><span>計測完了<small>FINISHED</small></span><strong>{String(results.length).padStart(2, '0')}</strong></div></section>
-          <section className="mode-section" aria-labelledby="mode-heading"><div className="section-title"><div><span className="eyebrow">YOUR POSITION. YOUR CONTROL.</span><h2 id="mode-heading">担当するモードを選択</h2></div><span className="section-index">01 — 04</span></div><div className="mode-grid">{MODES.map((mode, index) => {
+          <section className="mode-section" aria-labelledby="mode-heading"><div className="section-title"><div><span className="eyebrow">YOUR POSITION. YOUR CONTROL.</span><h2 id="mode-heading">担当するモードを選択</h2></div><span className="section-index">01 — 05</span></div><div className="mode-grid">{MODES.map((mode, index) => {
             const Icon = mode.icon;
             return <button key={mode.id} className={`mode-card ${mode.tone}`} onClick={() => changeMode(mode.id)}><div className="mode-card-top"><Icon size={26} strokeWidth={1.6} /><span>0{index + 1}</span></div><span className="mode-tag">{mode.tag}</span><h3>{mode.english}</h3><strong>{mode.title}</strong><p>{mode.description}</p><span className="mode-card-bottom">モードを開く<ArrowRight size={20} /></span></button>;
           })}</div></section>
           <div className="home-note"><Radio size={16} /><span>各端末の計測データをリアルタイムで共有</span><span className="note-rule" /><span className="eyebrow">BUILT FOR THE STAGE.</span></div>
         </> : <>
-          <div className="page-heading"><div><span className="eyebrow orange-text">{currentMode.tag} <ChevronRight size={12} /> {currentMode.english}</span><h1>{currentMode.title}</h1><details className="page-help" key={role}><summary>画面の説明<ChevronDown size={16} /></summary><p>{role === 'A' ? '車両を選択し、スタートの瞬間にタップ。' : role === 'B' ? '車両番号を確認し、ゴールの瞬間にタップ。' : role === 'viewer' ? 'ステージの動きを、リアルタイムで。フィルターでイベントや車両を選び、タイム順・新着順を切り替えられます。' : '計測する車両を、事前に登録。'}</p></details></div><span className={`page-icon ${currentMode.tone}`}><currentMode.icon size={30} strokeWidth={1.5} /></span></div>
-          {role === 'entry' ? <><EventControl event={currentEvent} name={eventName} onNameChange={setEventName} onStart={startEvent} onEnd={endEvent} connected={connected && eventSupport} pending={eventPending} runningCount={activeRuns.length} /><div className="entry-layout">
+          <div className="page-heading"><div><span className="eyebrow orange-text">{currentMode.tag} <ChevronRight size={12} /> {currentMode.english}</span><h1>{currentMode.title}</h1><details className="page-help" key={role}><summary>画面の説明<ChevronDown size={16} /></summary><p>{role === 'A' ? '車両を選択し、スタートの瞬間にタップ。' : role === 'B' ? '車両番号を確認し、ゴールの瞬間にタップ。' : role === 'viewer' ? 'ステージの動きを、リアルタイムで。フィルターでイベントや車両を選び、タイム順・新着順を切り替えられます。' : role === 'admin' ? '再認証後、保存済みイベントのCSV保存・削除を行えます。' : '計測する車両を、事前に登録。'}</p></details></div><span className={`page-icon ${currentMode.tone}`}><currentMode.icon size={30} strokeWidth={1.5} /></span></div>
+          {role === 'admin' ? <AdminMode socket={socketClient} connected={connected} events={events} supported={capabilities.admin} /> : role === 'entry' ? <><EventControl event={currentEvent} name={eventName} onNameChange={setEventName} onStart={startEvent} onEnd={endEvent} connected={connected && eventSupport} pending={eventPending} runningCount={activeRuns.length} /><div className="entry-layout">
             <section className="panel entry-form-panel"><div className="panel-heading"><div><span className="eyebrow">NEW ENTRY</span><h2>車両を登録</h2></div><Plus size={22} className="subtle-icon" /></div><form onSubmit={addEntry} className="entry-form"><label htmlFor="car-number">車両番号 <span>CAR NO.</span></label><input id="car-number" inputMode="numeric" placeholder="例：101" maxLength={20} disabled={!canModify} required value={newCarNumber} onChange={(event) => setNewCarNumber(event.target.value)} /><label htmlFor="vehicle-name">車両名・チーム名 <span>DRIVER / CAR</span></label><input id="vehicle-name" placeholder="例：GR YARIS / Rally Team" maxLength={120} disabled={!canModify} required value={newVehicleName} onChange={(event) => setNewVehicleName(event.target.value)} /><button className="button primary-button" disabled={!canModify || pendingActions.includes('addEntry:') || !newCarNumber.trim() || !newVehicleName.trim()}><Plus size={21} />エントリーを追加</button><p className="form-hint">登録した車両は、スタート画面で選択できます。</p></form></section>
-            <section className="panel"><div className="panel-heading"><div><span className="eyebrow">REGISTERED CARS</span><h2>エントリーリスト <span className="count">{entries.length}</span></h2></div><Users size={22} className="subtle-icon" /></div>{!entries.length ? <EmptyState icon={Users} title="車両を登録しましょう" description="車両番号と車両名を入力して追加してください。" /> : <ul className="entry-list">{entries.map((entry) => <li key={entry.id}><span className="car-number">#{entry.carNumber}</span><strong>{entry.vehicleName}</strong><button className="button icon-button text-danger" aria-label={`車両 ${entry.carNumber} を削除`} disabled={!canModify || pendingActions.includes('deleteEntry:') || activeRuns.some((run) => run.carId === entry.id)} onClick={() => { if (window.confirm(`#${entry.carNumber} のエントリーを削除しますか？`)) send('deleteEntry', { entryId: entry.id }); }}><Trash2 size={19} /></button></li>)}</ul>}</section>
+            <section className="panel"><div className="panel-heading"><div><span className="eyebrow">REGISTERED CARS</span><h2>エントリーリスト <span className="count">{entries.length}</span></h2></div><label className="entry-sort">表示順<select aria-label="エントリーリストの表示順" value={entrySort} onChange={e => setEntrySort(e.target.value)}><option value="added">追加順</option><option value="number">カーナンバー順</option><option value="name">名前順</option></select></label></div>{!entries.length ? <EmptyState icon={Users} title="車両を登録しましょう" description="車両番号と車両名を入力して追加してください。" /> : <ul className="entry-list">{displayEntries.map((entry) => <li key={entry.id}><span className="car-number">#{entry.carNumber}</span><strong>{entry.vehicleName}</strong><button className="button icon-button text-danger" aria-label={`車両 ${entry.carNumber} を削除`} disabled={!canModify || pendingActions.includes('deleteEntry:') || activeRuns.some((run) => run.carId === entry.id)} onClick={() => { if (window.confirm(`#${entry.carNumber} のエントリーを削除しますか？`)) send('deleteEntry', { entryId: entry.id }); }}><Trash2 size={19} /></button></li>)}</ul>}</section>
           </div></> : <div className="timing-layout">
-            {role === 'A' && <section className="panel start-panel"><div className="panel-heading"><div><span className="eyebrow orange-text">START CONTROL</span><h2>次のスタート車両</h2></div><Timer size={23} className="orange-text" /></div><div className="start-controls"><label htmlFor="start-car">車両を選択</label><select id="start-car" disabled={!canModify} value={selectedCarId} onChange={(event) => setSelectedCarId(event.target.value)}><option value="">車両番号・車両名を選択</option>{entries.map((entry) => <option key={entry.id} value={entry.id} disabled={activeRuns.some((run) => run.carId === entry.id)}>#{entry.carNumber} — {entry.vehicleName}{activeRuns.some((run) => run.carId === entry.id) ? '（走行中）' : ''}</option>)}</select><div className="start-preview">{selectedCar ? <><span className="car-number">#{selectedCar.carNumber}</span><strong>{selectedCar.vehicleName}</strong></> : <><Flag size={24} /><span>スタートする車両を選んでください</span></>}</div><button className="button primary-button start-button" onClick={startRun} disabled={!canStart}><Timer size={28} /><span>START<small>計測を開始</small></span><ArrowRight size={23} /></button>{!entries.length && <button className="inline-link" onClick={() => changeMode('entry')}>まずは車両を登録<ArrowRight size={16} /></button>}</div></section>}
-            <div className="timing-content">{role === 'viewer' ? <>{renderResults()}{renderRuns()}</> : <>{renderRuns()}{renderResults()}</>}</div>
+            {role === 'A' && renderStartPanel()}
+            <div className="timing-content">{role === 'viewer' ? <>{renderResults()}{renderRuns()}</> : <>{role === 'A' && sessionMode === 'rally' && <RallyControl key={currentEvent?.id} entries={numberEntries} order={runOrder} revision={orderRevision} send={send} disabled={!canModify || orderPending} />}{renderRuns()}{renderResults()}</>}</div>
           </div>}
         </>}
       </main>
