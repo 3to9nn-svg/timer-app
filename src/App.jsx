@@ -238,7 +238,8 @@ export default function App() {
 
   useEffect(() => {
     if (!Object.keys(arrivals).length) return;
-    const timeout = setTimeout(() => setArrivals({}), 3200);
+    const duration = Math.max(...Object.values(arrivals).map(kind => kind === 'global' ? 7400 : kind === 'personal' ? 4700 : 3200));
+    const timeout = setTimeout(() => setArrivals({}), duration);
     return () => clearTimeout(timeout);
   }, [arrivals]);
 

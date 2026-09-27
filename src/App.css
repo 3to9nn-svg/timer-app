@@ -546,8 +546,8 @@ input::placeholder { color: #8496a1; }
 }
 
 .arrival-normal { animation: result-arrive .7s ease-out both; }
-.arrival-personal { animation: personal-arrive 1.5s ease-out both; }
-.arrival-global { animation: global-arrive 2.4s ease-out both; }
+.arrival-personal { animation: personal-arrive 1.5s ease-out 3 both; }
+.arrival-global { animation: global-arrive 2.4s ease-out 3 both; }
 .arrival-personal .result-time > strong { color: var(--green); }
 .arrival-global .result-time > strong { color: #ffd478; }
 @keyframes result-arrive {
