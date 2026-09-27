@@ -160,6 +160,8 @@ input::placeholder { color: #8496a1; }
 .best-label { color: var(--orange); font: 9px var(--mono); letter-spacing: 1px; }
 .time-gap { color: #abbcc6; font: 11px var(--mono); }
 .results-options { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
+.viewer-mode .results-heading { flex-wrap: wrap; }
+.results-heading .results-options { flex-basis: 100%; padding: 0; border-bottom: 0; }
 .segmented-control { display: flex; background: #07151e; border: 1px solid #344853; padding: 4px; border-radius: 4px; }
 .segmented-control button { display: flex; justify-content: center; align-items: center; gap: 8px; background: none; border: 0; border-radius: 2px; min-height: 44px; padding: 10px 16px; font-size: 12px; color: var(--muted); }
 .segmented-control button[aria-pressed='true'] { color: #15222a; background: var(--orange); font-weight: 700; }
@@ -368,27 +370,40 @@ input::placeholder { color: #8496a1; }
   .results-scope { padding: 12px 14px; }
 }
 
-/* The spectator screen uses the available desktop width for readable timing. */
+/* Compact desktop classification: ten rows fit on a typical laptop screen. */
 @media (min-width: 1024px) {
   .viewer-mode .header-inner, .viewer-mode .main-content { max-width: 1800px; }
-  .viewer-mode .main-content { padding-top: 24px; }
-  .viewer-mode .site-footer { max-width: 1720px; margin-inline: auto; }
-  .viewer-mode .page-heading { margin-bottom: 20px; }
-  .viewer-mode .page-heading h1 { font-size: 34px; }
-  .viewer-mode .panel-heading { padding: 24px 32px; }
-  .viewer-mode .panel-heading h2 { font-size: 24px; }
-  .viewer-mode .count { font-size: 15px; }
-  .viewer-mode .results-heading .button, .viewer-mode .segmented-control button { font-size: 15px; min-height: 48px; padding-inline: 20px; }
-  .viewer-mode .results-filters { padding-inline: 32px; }
-  .viewer-mode .results-options { padding: 16px 32px; }
-  .viewer-mode .results-scope { padding: 12px 32px; font-size: 14px; }
-  .viewer-mode .result-row { gap: 28px; min-height: 114px; padding: 22px 32px; }
-  .viewer-mode .position { font-size: 36px; min-width: 2ch; }
-  .viewer-mode .result-car { gap: 8px 20px; }
-  .viewer-mode .result-number { font-size: 30px; }
-  .viewer-mode .result-car > strong { font-size: clamp(23px, 1.8vw, 30px); }
-  .viewer-mode .result-date { font-size: 14px; }
-  .viewer-mode .result-time { flex-shrink: 0; gap: 8px; }
-  .viewer-mode .result-time > strong { font-size: clamp(36px, 3.2vw, 52px); }
-  .viewer-mode .best-label, .viewer-mode .time-gap { font-size: 15px; }
+  .viewer-mode .header-inner { min-height: 60px; padding-inline: 26px; }
+  .viewer-mode .brand { font-size: 21px; }
+  .viewer-mode .main-content { padding: 12px 26px 32px; }
+  .viewer-mode .site-footer { max-width: 1748px; margin-inline: auto; }
+  .viewer-mode .event-strip { padding: 7px 12px; margin-bottom: 8px; font-size: 12px; }
+  .viewer-mode .page-heading { margin-bottom: 10px; }
+  .viewer-mode .page-heading > div { display: grid; grid-template-columns: 1fr auto; column-gap: 28px; align-items: center; }
+  .viewer-mode .page-heading h1 { grid-column: 1; margin-top: 5px; font-size: 26px; }
+  .viewer-mode .page-help { grid-column: 2; grid-row: 1 / 3; margin-top: 0; }
+  .viewer-mode .page-help p { max-width: 360px; }
+  .viewer-mode .page-icon { width: 44px; height: 44px; }
+  .viewer-mode .panel-heading { padding: 6px 24px; }
+  .viewer-mode .panel-heading .eyebrow { font-size: 9px; line-height: 1.2; }
+  .viewer-mode .panel-heading h2 { font-size: 18px; line-height: 1.2; margin-top: 4px; }
+  .viewer-mode .count { font-size: 12px; }
+  .viewer-mode .results-heading { flex-wrap: nowrap; align-items: center; gap: 20px; }
+  .viewer-mode .results-heading > div:first-child { flex: 1; }
+  .viewer-mode .results-heading .toolbar { order: 2; flex-wrap: nowrap; }
+  .viewer-mode .results-heading .button, .viewer-mode .segmented-control button { font-size: 12px; min-height: 40px; padding: 8px 14px; white-space: nowrap; }
+  .viewer-mode .results-options { flex-basis: auto; padding: 0; }
+  .viewer-mode .results-options > .eyebrow { display: none; }
+  .viewer-mode .results-filters { padding: 12px 24px; }
+  .viewer-mode .results-scope { padding: 5px 24px; font-size: 11px; line-height: 1.4; }
+  .viewer-mode .result-row { gap: 18px; min-height: clamp(48px, calc((100dvh - 300px) / 10), 68px); padding: 4px 24px; }
+  .viewer-mode .position { font-size: 22px; min-width: 2ch; }
+  .viewer-mode .result-car { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 14px; }
+  .viewer-mode .result-number { font-size: 20px; line-height: 1.1; }
+  .viewer-mode .result-car > strong { font-size: 18px; line-height: 1.25; }
+  .viewer-mode .result-date { grid-column: 1 / -1; font-size: 10px; line-height: 1.2; }
+  .viewer-mode .result-time { flex-shrink: 0; gap: 2px; }
+  .viewer-mode .result-time > strong { font-size: 26px; line-height: 1; }
+  .viewer-mode .best-label, .viewer-mode .time-gap { font-size: 10px; line-height: 1.2; }
+  .viewer-mode .bottom-nav { position: static; }
 }
