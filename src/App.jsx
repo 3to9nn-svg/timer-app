@@ -7,7 +7,7 @@ import { ModeMenu } from './ModeMenu';
 import { AdminMode } from './AdminMode';
 import { RallyControl } from './RallyControl';
 import { NewResultBadge } from './NewResultBadge';
-import { resultFilename, resultCarOptions, selectResults, summarizeResults } from './result-utils';
+import { resultFilename, resultCSVRows, resultCarOptions, selectResults, summarizeResults } from './result-utils';
 
 const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'https://timer-server-qf32.onrender.com/';
 const SESSION_KEY = 'rally-timing-session';
@@ -342,15 +342,13 @@ export default function App() {
   const exportCSV = () => {
     const exportedResults = role === 'viewer' ? sortedResults : results;
     if (!exportedResults.length) return;
-    const rows = [['イベント', '日時', 'カーナンバー', '車両名', 'タイム'], ...exportedResults.map((result) => [
-      (role === 'viewer' ? viewedEvent : currentEvent)?.name || '',
-      new Date(result.timestamp).toLocaleString('ja-JP'), result.carNumber, result.vehicleName, formatTime(result.timeMs),
-    ])];
+    const exportOrder = role === 'viewer' ? sortOrder : 'latest';
+    const rows = resultCSVRows(role === 'viewer' ? viewedEvent : currentEvent, exportedResults, exportOrder);
     const csv = '\uFEFF' + rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = resultFilename(role === 'viewer' ? viewedEvent : currentEvent);
+    link.download = resultFilename(role === 'viewer' ? viewedEvent : currentEvent, exportOrder);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -433,7 +431,7 @@ export default function App() {
         <ol className={`result-list ${ranked ? 'ranked-results' : ''}`}>{sortedResults.map((result, index) => (
           <li className={`result-row ${ranked && index === 0 ? 'leader' : ''}`} key={result.id}>
             {ranked && <span className="position">{String(index + 1).padStart(2, '0')}</span>}
-            <div className="result-car"><span className="result-number">#{result.carNumber}</span><strong title={result.vehicleName}>{result.vehicleName}</strong><span className="result-date">{new Date(result.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} フィニッシュ{role === 'viewer' && sortOrder !== 'overall' && result.timeMs === bestByCar.get(result.carNumber)?.timeMs && <span className="personal-best-badge" title="このカーナンバーのベストタイム" aria-label="パーソナルベスト">PB</span>}{role === 'viewer' && result.id === latest?.id && <NewResultBadge key={result.id} timestamp={result.timestamp} />}</span></div>
+            <div className="result-identity"><div className="result-car"><span className="result-number">#{result.carNumber}</span><strong title={result.vehicleName}>{result.vehicleName}</strong><span className="result-date">{new Date(result.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} フィニッシュ</span></div>{role === 'viewer' && <div className="result-badges">{sortOrder !== 'overall' && result.timeMs === bestByCar.get(result.carNumber)?.timeMs && <span className="personal-best-badge" title="このカーナンバーのベストタイム" aria-label="パーソナルベスト">PB</span>}{result.id === latest?.id && <NewResultBadge key={result.id} timestamp={result.timestamp} />}</div>}</div>
             <div className="result-time"><strong>{formatTime(result.timeMs)}</strong>{ranked && <span className={index === 0 ? 'best-label' : 'time-gap'}>{index === 0 ? 'BEST TIME' : `+${formatTime(result.timeMs - fastest)}`}</span>}</div>
           </li>
         ))}</ol>

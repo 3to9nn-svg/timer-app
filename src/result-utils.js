@@ -1,4 +1,4 @@
-export function resultFilename(event) {
+export function resultFilename(event, sortOrder = 'latest') {
   const name = (event?.name || 'イベント').replace(/[<>:"/\\|?*\p{Cc}]/gu, '_').replace(/[. ]+$/g, '') || 'イベント';
   let ended = '開催中';
   if (event?.endedAt != null && Number.isFinite(new Date(event.endedAt).getTime())) {
@@ -9,7 +9,16 @@ export function resultFilename(event) {
     const part = type => parts.find(item => item.type === type).value;
     ended = `${part('year')}-${part('month')}-${part('day')}_${part('hour')}-${part('minute')}-${part('second')}`;
   } else if (event?.status === 'ended') ended = '終了日時未設定';
-  return `Result_${name}_${ended}.csv`;
+  const selection = { time: 'Time', latest: 'history', overall: 'Overall' }[sortOrder] || 'history';
+  return `Result_${name}_${ended}_${selection}.csv`;
+}
+
+export function resultCSVRows(event, results, sortOrder) {
+  const sorted = selectResults(results, sortOrder);
+  const ranked = sortOrder === 'time' || sortOrder === 'overall';
+  const format = ms => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}.${String(Math.floor(ms / 10) % 100).padStart(2, '0')}`;
+  return [[...(ranked ? ['順位'] : []), 'イベント', '日時', 'カーナンバー', '車両名', 'タイム', ...(ranked ? ['1位との差'] : [])],
+    ...sorted.map((result, index) => [...(ranked ? [index + 1] : []), event?.name || '', new Date(result.timestamp).toLocaleString('ja-JP'), result.carNumber, result.vehicleName, format(result.timeMs), ...(ranked ? [`+${format(result.timeMs - sorted[0].timeMs)}`] : [])])];
 }
 
 export function summarizeResults(results) {

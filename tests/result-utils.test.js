@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resultFilename, resultCarOptions, selectResults, summarizeResults } from '../src/result-utils.js';
+import { resultFilename, resultCSVRows, resultCarOptions, selectResults, summarizeResults } from '../src/result-utils.js';
 
 const rows = [
   { id: 'a', carNumber: '100', vehicleName: 'Old name', timeMs: 61000, timestamp: 100 },
@@ -26,7 +26,21 @@ test('options include names and deleted entries, sorted numerically', () => {
   assert.deepEqual(resultCarOptions([{ carNumber: '100', vehicleName: 'Current name' }, { carNumber: '30', vehicleName: 'Not started' }], rows), [['2', 'Car 2'], ['30', 'Not started'], ['100', 'Current name']]);
 });
 test('CSV filenames use event end in JST, safe characters, and explicit unfinished status', () => {
-  assert.equal(resultFilename({ name: '秋のラリー', endedAt: Date.parse('2026-09-27T08:05:06Z') }), 'Result_秋のラリー_2026-09-27_17-05-06.csv');
-  assert.equal(resultFilename({ name: '走行会', status: 'active' }), 'Result_走行会_開催中.csv');
-  assert.equal(resultFilename({ name: 'A/B:C?\n', status: 'ended' }), 'Result_A_B_C___終了日時未設定.csv');
+  assert.equal(resultFilename({ name: '秋のラリー', endedAt: Date.parse('2026-09-27T08:05:06Z') }), 'Result_秋のラリー_2026-09-27_17-05-06_history.csv');
+  assert.equal(resultFilename({ name: '走行会', status: 'active' }, 'time'), 'Result_走行会_開催中_Time.csv');
+  assert.equal(resultFilename({ name: 'A/B:C?\n', status: 'ended' }, 'overall'), 'Result_A_B_C___終了日時未設定_Overall.csv');
+});
+
+test('ranked CSV includes display ranks and gaps, history omits both', () => {
+  const time = resultCSVRows({ name: 'Test' }, rows, 'time');
+  assert.deepEqual(time[0], ['順位', 'イベント', '日時', 'カーナンバー', '車両名', 'タイム', '1位との差']);
+  assert.deepEqual(time.slice(1).map(row => [row[0], row[3], row[6]]), [[1, '2', '+00:00.00'], [2, '100', '+00:05.00'], [3, '100', '+00:05.00'], [4, '100', '+00:06.00'], [5, '2', '+00:10.00']]);
+  const overall = resultCSVRows({}, rows, 'overall');
+  assert.equal(overall.length, 3);
+  assert.deepEqual(overall.slice(1).map(row => row[6]), ['+00:00.00', '+00:05.00']);
+  const filtered = resultCSVRows({}, rows.filter(row => row.carNumber === '100'), 'time');
+  assert.deepEqual(filtered.slice(1).map(row => row[6]), ['+00:00.00', '+00:00.00', '+00:01.00']);
+  const history = resultCSVRows({}, rows, 'latest');
+  assert.deepEqual(history[0], ['イベント', '日時', 'カーナンバー', '車両名', 'タイム']);
+  assert.equal(history[1][4], '01:05.00');
 });
