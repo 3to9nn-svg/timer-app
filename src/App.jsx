@@ -76,7 +76,7 @@ export default function App() {
   const [sortOrder, setSortOrder] = useState('time');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
-  const [viewerRunsOpen, setViewerRunsOpen] = useState(false);
+  const [viewerRunsOpen, setViewerRunsOpen] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
   const [entries, setEntries] = useState([]);
   const [activeRuns, setActiveRuns] = useState([]);
   const [results, setResults] = useState([]);
@@ -389,7 +389,7 @@ export default function App() {
         <ol className={`result-list ${role === 'viewer' && sortOrder === 'time' ? 'ranked-results' : ''}`}>{sortedResults.map((result, index) => (
           <li className={`result-row ${role === 'viewer' && sortOrder === 'time' && index === 0 ? 'leader' : ''}`} key={result.id}>
             {role === 'viewer' && sortOrder === 'time' && <span className="position">{String(index + 1).padStart(2, '0')}</span>}
-            <div className="result-car"><span className="result-number">#{result.carNumber}</span><strong>{result.vehicleName}</strong><span className="result-date">{new Date(result.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} フィニッシュ</span></div>
+            <div className="result-car"><span className="result-number">#{result.carNumber}</span><strong title={result.vehicleName}>{result.vehicleName}</strong><span className="result-date">{new Date(result.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} フィニッシュ</span></div>
             <div className="result-time"><strong>{formatTime(result.timeMs)}</strong>{role === 'viewer' && sortOrder === 'time' && <span className={index === 0 ? 'best-label' : 'time-gap'}>{index === 0 ? 'BEST TIME' : `+${formatTime(result.timeMs - fastest)}`}</span>}</div>
           </li>
         ))}</ol>

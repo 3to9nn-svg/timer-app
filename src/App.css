@@ -376,6 +376,7 @@ input::placeholder { color: #8496a1; }
   .viewer-mode .header-inner { min-height: 60px; padding-inline: 26px; }
   .viewer-mode .brand { font-size: 21px; }
   .viewer-mode .main-content { padding: 12px 26px 32px; }
+  .viewer-mode .timing-content { grid-template-columns: minmax(0, 1.8fr) minmax(320px, 1fr); align-items: start; gap: 24px; }
   .viewer-mode .site-footer { max-width: 1748px; margin-inline: auto; }
   .viewer-mode .event-strip { padding: 7px 12px; margin-bottom: 8px; font-size: 12px; }
   .viewer-mode .page-heading { margin-bottom: 10px; }
@@ -384,26 +385,45 @@ input::placeholder { color: #8496a1; }
   .viewer-mode .page-help { grid-column: 2; grid-row: 1 / 3; margin-top: 0; }
   .viewer-mode .page-help p { max-width: 360px; }
   .viewer-mode .page-icon { width: 44px; height: 44px; }
-  .viewer-mode .panel-heading { padding: 6px 24px; }
+  .viewer-mode .panel-heading { padding: 6px 16px; }
   .viewer-mode .panel-heading .eyebrow { font-size: 9px; line-height: 1.2; }
-  .viewer-mode .panel-heading h2 { font-size: 18px; line-height: 1.2; margin-top: 4px; }
+  .viewer-mode .panel-heading h2 { font-size: 16px; line-height: 1.2; margin-top: 4px; }
   .viewer-mode .count { font-size: 12px; }
-  .viewer-mode .results-heading { flex-wrap: nowrap; align-items: center; gap: 20px; }
+  .viewer-mode .results-heading { flex-wrap: nowrap; align-items: center; gap: 12px; }
   .viewer-mode .results-heading > div:first-child { flex: 1; }
   .viewer-mode .results-heading .toolbar { order: 2; flex-wrap: nowrap; }
-  .viewer-mode .results-heading .button, .viewer-mode .segmented-control button { font-size: 12px; min-height: 40px; padding: 8px 14px; white-space: nowrap; }
+  .viewer-mode .results-heading .button, .viewer-mode .segmented-control button { font-size: 11px; min-height: 40px; padding: 8px 10px; white-space: nowrap; }
   .viewer-mode .results-options { flex-basis: auto; padding: 0; }
   .viewer-mode .results-options > .eyebrow { display: none; }
-  .viewer-mode .results-filters { padding: 12px 24px; }
-  .viewer-mode .results-scope { padding: 5px 24px; font-size: 11px; line-height: 1.4; }
-  .viewer-mode .result-row { gap: 18px; min-height: clamp(48px, calc((100dvh - 300px) / 10), 68px); padding: 4px 24px; }
+  .viewer-mode .results-filters { padding: 12px 16px; }
+  .viewer-mode .results-scope { padding: 5px 16px; font-size: 11px; line-height: 1.4; }
+  .viewer-mode .result-row { gap: 14px; min-height: clamp(48px, calc((100dvh - 300px) / 10), 68px); padding: 4px 16px; }
   .viewer-mode .position { font-size: 22px; min-width: 2ch; }
   .viewer-mode .result-car { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 14px; }
   .viewer-mode .result-number { font-size: 20px; line-height: 1.1; }
-  .viewer-mode .result-car > strong { font-size: 18px; line-height: 1.25; }
+  .viewer-mode .result-car > strong { font-size: 18px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .viewer-mode .result-date { grid-column: 1 / -1; font-size: 10px; line-height: 1.2; }
   .viewer-mode .result-time { flex-shrink: 0; gap: 2px; }
   .viewer-mode .result-time > strong { font-size: 26px; line-height: 1; }
   .viewer-mode .best-label, .viewer-mode .time-gap { font-size: 10px; line-height: 1.2; }
+  .viewer-mode .run-grid { grid-template-columns: minmax(0, 1fr); padding: 14px; gap: 12px; }
+  .viewer-mode .run-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 16px 14px; min-height: 124px; }
+  .viewer-mode .run-car { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 8px; }
+  .viewer-mode .run-car .car-number { font-size: 24px; max-width: none; padding: 8px; }
+  .viewer-mode .run-car h3 { font-size: 12px; }
+  .viewer-mode .run-car .eyebrow { font-size: 7px; letter-spacing: .5px; }
+  .viewer-mode .running-label { grid-column: 1 / -1; margin-left: 0; font-size: 10px; }
+  .viewer-mode .run-clock { padding: 0; gap: 10px; }
+  .viewer-mode .run-clock .eyebrow { font-size: 8px; letter-spacing: 1px; }
+  .viewer-mode .live-time { font-size: clamp(26px, 2.2vw, 36px); }
   .viewer-mode .bottom-nav { position: static; }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .viewer-mode .timing-content { gap: 16px; }
+  .viewer-mode .results-heading { flex-wrap: wrap; }
+  .viewer-mode .results-heading > div:first-child { flex-basis: 100%; }
+  .viewer-mode .results-options { margin-right: auto; }
+  .viewer-mode .result-car { gap: 2px 8px; }
+  .viewer-mode .result-car > strong { font-size: 16px; }
 }
