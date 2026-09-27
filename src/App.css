@@ -180,6 +180,9 @@ input::placeholder { color: #8496a1; }
 .ranked-results .result-number { font-size: 20px; }
 .ranked-results .result-car > strong { font-size: 18px; }
 .result-date { width: 100%; color: var(--muted); font-size: 10px; }
+.personal-best-badge, .new-result-badge { display: inline-block; vertical-align: middle; margin-left: 6px; padding: 1px 4px; border-radius: 2px; font: 700 9px/1.2 var(--mono); }
+.personal-best-badge { color: var(--green); border: 1px solid #7be4b360; background: #7be4b310; }
+.new-result-badge { color: #10202a; background: var(--orange); border: 1px solid var(--orange); }
 .result-time { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
 .result-time > strong { font: 700 23px var(--mono); letter-spacing: -1px; font-variant-numeric: tabular-nums; }
 .best-label { color: var(--orange); font: 9px var(--mono); letter-spacing: 1px; }
@@ -451,4 +454,75 @@ input::placeholder { color: #8496a1; }
   .viewer-mode .results-options { margin-right: auto; }
   .viewer-mode .result-car { gap: 2px 8px; }
   .viewer-mode .result-car > strong { font-size: 16px; }
+}
+
+/* Keep primary controls in reach on phones without reducing touch targets. */
+@media (max-width: 760px) {
+  .header-inner { min-height: 60px; padding-block: 4px; }
+  .brand { font-size: 20px; padding-block: 5px; }
+  .brand small { margin-top: 4px; }
+  .brand-mark span { height: 25px; }
+  .main-content, .in-mode .main-content { padding: 12px 14px 20px; }
+  .event-strip { padding: 6px 10px; margin-bottom: 10px; font-size: 12px; }
+  .event-summary { padding: 10px 12px; margin-bottom: 12px; }
+  .event-summary strong { margin-top: 3px; }
+  .page-heading { margin-bottom: 10px; }
+  .page-heading > div { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 10px; width: 100%; }
+  .page-heading h1 { grid-column: 1; margin-top: 4px; font-size: 22px; }
+  .page-heading .eyebrow { font-size: 8px; letter-spacing: .5px; }
+  .page-help { grid-column: 2; grid-row: 1 / 3; margin: 0; }
+  .page-help[open] { grid-column: 1 / -1; grid-row: 3; }
+  .page-help summary { font-size: 11px; }
+  .page-icon { display: none; }
+  .panel-heading { padding: 10px 12px; gap: 8px; }
+  .panel-heading h2 { margin-top: 3px; font-size: 15px; }
+  .panel-heading .eyebrow { font-size: 8px; letter-spacing: 1px; }
+  .timing-layout, .timing-content, .entry-layout { gap: 12px; }
+  .start-controls, .entry-form, .admin-body, .rally-order-body { padding: 12px; gap: 10px; }
+  input, select { padding: 10px; min-height: 46px; }
+  .start-preview { min-height: 44px; padding: 4px 0; }
+  .start-button { min-height: 66px; }
+  .run-grid { padding: 10px; gap: 10px; }
+  .run-card { padding: 12px; }
+  .run-clock { padding: 12px 0; gap: 6px; }
+  .run-actions { padding-top: 10px; gap: 6px; }
+  .finish-button { min-height: 64px; }
+  .empty-state { padding: 22px 12px; }
+  .empty-state > svg { margin-bottom: 10px; }
+  .results-heading { gap: 8px; }
+  .results-heading .toolbar { width: auto; margin-left: auto; gap: 6px; }
+  .results-heading .button { font-size: 11px; padding: 8px; min-height: 44px; }
+  .results-heading .results-options { padding: 0; }
+  .results-options > .eyebrow { display: none; }
+  .segmented-control { width: 100%; }
+  .segmented-control button { font-size: 11px; padding: 8px 6px; gap: 4px; }
+  .results-filters { padding: 10px 12px 0; gap: 10px; }
+  .results-filters > div { gap: 5px; }
+  .results-scope { padding: 7px 12px; font-size: 10px; }
+  .result-row { padding: 10px 12px; gap: 8px; }
+  .result-car > strong, .result-date { margin-top: 2px; }
+  .result-date { line-height: 1.6; }
+  .result-time { gap: 3px; }
+  .entry-list li { padding: 10px 12px; }
+  .entry-form input { margin-bottom: 0; }
+  .event-control { margin-bottom: 12px; }
+  .event-control-body { padding: 12px; gap: 10px; }
+  .event-control-description p { margin-top: 4px; }
+  .event-start-form { gap: 8px; }
+  .admin-events > li, .order-list > li { padding: 10px 0; gap: 8px; }
+  .hero { padding: 4px 0 18px; }
+  .hero-kicker { margin-bottom: 10px; }
+  .hero h1 { font-size: 44px; }
+  .hero-japanese { margin-top: 12px; }
+  .hero-description { margin-top: 6px; }
+  .session-stats > div { padding: 10px; gap: 6px; }
+  .mode-section { margin-top: 16px; }
+  .mode-card { padding-top: 12px; }
+  .mode-card-top { margin-bottom: 10px; }
+  .mode-card p { margin-bottom: 8px; }
+  .site-footer { padding-block: 12px; }
+}
+@media (max-width: 520px) {
+  .connection { padding-top: 2px; }
+  .segmented-control button > svg { display: none; }
 }

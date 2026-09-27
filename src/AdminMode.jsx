@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, LockKeyhole, Trash2 } from 'lucide-react';
+import { resultFilename } from './result-utils';
 
 function saveEventCSV(event) {
   const time = ms => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}.${String(Math.floor(ms / 10) % 100).padStart(2, '0')}`;
@@ -14,7 +15,7 @@ function saveEventCSV(event) {
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Rally_Event_${event.id}.csv`;
+  link.download = resultFilename(event);
   document.body.appendChild(link);
   link.click();
   link.remove();

@@ -6,6 +6,8 @@ import { EventControl } from './EventControl';
 import { ModeMenu } from './ModeMenu';
 import { AdminMode } from './AdminMode';
 import { RallyControl } from './RallyControl';
+import { NewResultBadge } from './NewResultBadge';
+import { resultFilename, resultCarOptions, selectResults, summarizeResults } from './result-utils';
 
 const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'https://timer-server-qf32.onrender.com/';
 const SESSION_KEY = 'rally-timing-session';
@@ -348,7 +350,7 @@ export default function App() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Rally_Timing_${(role === 'viewer' ? viewedEvent : currentEvent)?.id || 'results'}.csv`;
+    link.download = resultFilename(role === 'viewer' ? viewedEvent : currentEvent);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -360,9 +362,10 @@ export default function App() {
   const viewedResults = role === 'viewer' && archive ? archive.event?.results || [] : results;
   const viewedRuns = role === 'viewer' && archive ? archive.event?.activeRuns || [] : activeRuns;
   const viewedEntries = archive ? archive.event?.entries || [] : entries;
-  const carNumbers = [...new Set([...viewedEntries, ...viewedResults].map(item => item.carNumber))].sort((a, b) => a.localeCompare(b, 'ja', { numeric: true }));
-  const sortedResults = viewedResults.filter(result => role !== 'viewer' || !resultCarNumber || result.carNumber === resultCarNumber)
-    .sort((a, b) => role === 'viewer' && sortOrder === 'time' ? a.timeMs - b.timeMs || b.timestamp - a.timestamp : b.timestamp - a.timestamp);
+  const carOptions = resultCarOptions(viewedEntries, viewedResults);
+  const { bestByCar, latest } = summarizeResults(viewedResults);
+  const sortedResults = selectResults(viewedResults, role === 'viewer' ? sortOrder : 'latest', role === 'viewer' ? resultCarNumber : '');
+  const ranked = role === 'viewer' && sortOrder !== 'latest';
   const numberEntries = [...entries].sort((a, b) => a.carNumber.localeCompare(b.carNumber, 'ja', { numeric: true }) || a.vehicleName.localeCompare(b.vehicleName, 'ja'));
   const displayEntries = entrySort === 'number' ? numberEntries : entrySort === 'name' ? [...entries].sort((a, b) => a.vehicleName.localeCompare(b.vehicleName, 'ja', { numeric: true }) || a.carNumber.localeCompare(b.carNumber, 'ja', { numeric: true })) : entries;
   const nextOrder = runOrder.find(item => item.status === 'pending');
@@ -416,22 +419,22 @@ export default function App() {
         {role === 'viewer' ? <button className="button secondary-button disclosure-button" aria-expanded={filtersOpen} aria-controls="result-filters" onClick={() => setFiltersOpen(value => !value)}><SlidersHorizontal size={17} />フィルター{(archive || resultCarNumber) && <span className="filter-indicator" aria-label="絞り込み中" />}<ChevronDown size={16} /></button> : <button className="button secondary-button disclosure-button" aria-label="計測ログの表示切替" aria-expanded={logsOpen} aria-controls="results-content" onClick={() => setLogsOpen(value => !value)}>{logsOpen ? '閉じる' : '表示'}<ChevronDown size={18} /></button>}
         <button className="button secondary-button" disabled={!sortedResults.length || (role === 'viewer' && archive && !archive.event)} onClick={exportCSV}><Download size={17} />CSV保存</button>
       </div>
-      {role === 'viewer' && <div className="results-options"><div className="segmented-control" aria-label="結果の並び順"><button aria-pressed={sortOrder === 'time'} onClick={() => setSortOrder('time')}><Trophy size={16} />タイム順</button><button aria-pressed={sortOrder === 'latest'} onClick={() => setSortOrder('latest')}><ArrowDownUp size={16} />新着順</button></div><span className="eyebrow">TIME / MM:SS.00</span></div>}
+      {role === 'viewer' && <div className="results-options"><div className="segmented-control" aria-label="結果の並び順"><button aria-pressed={sortOrder === 'time'} onClick={() => setSortOrder('time')}><Trophy size={16} />タイム順</button><button aria-pressed={sortOrder === 'latest'} onClick={() => setSortOrder('latest')}><ArrowDownUp size={16} />新着順</button><button aria-pressed={sortOrder === 'overall'} onClick={() => setSortOrder('overall')} aria-label="オーバーオールリザルト順"><Flag size={16} />オーバーオール</button></div><span className="eyebrow">TIME / MM:SS.00</span></div>}
       </div>
       <div id="results-content" hidden={role !== 'viewer' && !logsOpen}>
       {role === 'viewer' && <>
         <div className="results-filters" id="result-filters" hidden={!filtersOpen}>
           <div><label htmlFor="result-event">イベント</label><select id="result-event" value={archive?.id || ''} onChange={e => selectArchive(e.target.value)} disabled={!connected}><option value="">{currentEvent ? `${currentEvent.name}（${currentEvent.status === 'active' ? '開催中' : '終了'}）` : 'イベント未開始'}</option>{events.filter(event => event.id !== currentEvent?.id).map(event => <option key={event.id} value={event.id}>{event.name}（{new Date(event.startedAt).toLocaleDateString('ja-JP')}・終了）</option>)}</select></div>
-          <div><label htmlFor="result-car-filter">カーナンバー</label><select id="result-car-filter" value={resultCarNumber} onChange={e => setResultCarNumber(e.target.value)} disabled={Boolean(archive && !archive.event)}><option value="">すべての車両</option>{carNumbers.map(number => <option key={number} value={number}>#{number}</option>)}</select></div>
+          <div><label htmlFor="result-car-filter">カーナンバー</label><select id="result-car-filter" value={resultCarNumber} onChange={e => setResultCarNumber(e.target.value)} disabled={Boolean(archive && !archive.event)}><option value="">すべての車両</option>{carOptions.map(([number, name]) => <option key={number} value={number}>#{number} — {name}</option>)}</select></div>
         </div>
-        <p className="results-scope">{archive && `${viewedEvent?.name || '過去のイベント'} · `}{resultCarNumber ? `#${resultCarNumber} の全走行` : 'すべての車両の走行'} · {sortedResults.length}件{sortOrder === 'time' && ' · 差は表示中のベストタイム基準'}</p>
+        <p className="results-scope">{archive && `${viewedEvent?.name || '過去のイベント'} · `}{sortOrder === 'overall' ? (resultCarNumber ? `#${resultCarNumber} のベストタイム` : '各車両のベストタイム') : (resultCarNumber ? `#${resultCarNumber} の全走行` : 'すべての車両の走行')} · {sortedResults.length}件{sortOrder !== 'latest' && ' · 差は表示中のベストタイム基準'}</p>
       </>}
       {role === 'viewer' && archive && !archive.event ? <div className="archive-status" role="status"><p>{archive.error || '過去の記録を読み込んでいます…'}</p>{archive.error && <button className="button secondary-button" disabled={!connected} onClick={() => selectArchive(archive.id)}>再試行</button>}</div> : !sortedResults.length ? <EmptyState icon={Trophy} title={resultCarNumber && role === 'viewer' ? 'この車両の計測結果はありません' : 'まだ計測結果はありません'} description="フィニッシュした車両のタイムがここに表示されます。" /> : (
-        <ol className={`result-list ${role === 'viewer' && sortOrder === 'time' ? 'ranked-results' : ''}`}>{sortedResults.map((result, index) => (
-          <li className={`result-row ${role === 'viewer' && sortOrder === 'time' && index === 0 ? 'leader' : ''}`} key={result.id}>
-            {role === 'viewer' && sortOrder === 'time' && <span className="position">{String(index + 1).padStart(2, '0')}</span>}
-            <div className="result-car"><span className="result-number">#{result.carNumber}</span><strong title={result.vehicleName}>{result.vehicleName}</strong><span className="result-date">{new Date(result.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} フィニッシュ</span></div>
-            <div className="result-time"><strong>{formatTime(result.timeMs)}</strong>{role === 'viewer' && sortOrder === 'time' && <span className={index === 0 ? 'best-label' : 'time-gap'}>{index === 0 ? 'BEST TIME' : `+${formatTime(result.timeMs - fastest)}`}</span>}</div>
+        <ol className={`result-list ${ranked ? 'ranked-results' : ''}`}>{sortedResults.map((result, index) => (
+          <li className={`result-row ${ranked && index === 0 ? 'leader' : ''}`} key={result.id}>
+            {ranked && <span className="position">{String(index + 1).padStart(2, '0')}</span>}
+            <div className="result-car"><span className="result-number">#{result.carNumber}</span><strong title={result.vehicleName}>{result.vehicleName}</strong><span className="result-date">{new Date(result.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} フィニッシュ{role === 'viewer' && sortOrder !== 'overall' && result.timeMs === bestByCar.get(result.carNumber)?.timeMs && <span className="personal-best-badge" title="このカーナンバーのベストタイム" aria-label="パーソナルベスト">PB</span>}{role === 'viewer' && result.id === latest?.id && <NewResultBadge key={result.id} timestamp={result.timestamp} />}</span></div>
+            <div className="result-time"><strong>{formatTime(result.timeMs)}</strong>{ranked && <span className={index === 0 ? 'best-label' : 'time-gap'}>{index === 0 ? 'BEST TIME' : `+${formatTime(result.timeMs - fastest)}`}</span>}</div>
           </li>
         ))}</ol>
       )}
