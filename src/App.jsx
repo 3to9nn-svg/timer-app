@@ -7,7 +7,7 @@ import { ModeMenu } from './ModeMenu';
 import { AdminMode } from './AdminMode';
 import { RallyControl } from './RallyControl';
 import { NewResultBadge } from './NewResultBadge';
-import { resultFilename, resultCSVRows, resultCarOptions, selectResults, summarizeResults } from './result-utils';
+import { classifyArrivals, resultFilename, resultCSVRows, resultCarOptions, selectResults, summarizeResults } from './result-utils';
 
 const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'https://timer-server-qf32.onrender.com/';
 const SESSION_KEY = 'rally-timing-session';
@@ -90,6 +90,7 @@ export default function App() {
   const [entries, setEntries] = useState([]);
   const [activeRuns, setActiveRuns] = useState([]);
   const [results, setResults] = useState([]);
+  const [arrivals, setArrivals] = useState({});
   const [currentEvent, setCurrentEvent] = useState(null);
   const [events, setEvents] = useState([]);
   const [eventSupport, setEventSupport] = useState(false);
@@ -153,8 +154,14 @@ export default function App() {
     socketRef.current = socket;
     let verified = false;
     let lastEventId;
-    const updateState = data => {
+    let previousResults = [];
+    const updateState = (data, animate = false) => {
       const nextEventId = data.currentEvent?.id || null;
+      if (animate && nextEventId === lastEventId) {
+        const additions = classifyArrivals(previousResults, data.results || []);
+        if (Object.keys(additions).length) setArrivals(additions);
+      } else setArrivals({});
+      previousResults = data.results || [];
       if (nextEventId !== lastEventId) {
         setSelectedCarId('');
         setResultCarNumber('');
@@ -215,7 +222,7 @@ export default function App() {
       }
     });
     socket.on('sessionExpired', () => lockApp('ログインが終了しました。パスワードを入力してください。'));
-    socket.on('stateUpdated', data => { if (verified && accessGrantedRef.current) updateState(data); });
+    socket.on('stateUpdated', data => { if (verified && accessGrantedRef.current) updateState(data, true); });
     socket.on('operationError', setOperationError);
     socket.on('initializationError', message => lockApp(message));
     const token = readSession();
@@ -228,6 +235,12 @@ export default function App() {
     const timeout = setTimeout(() => setNotice(''), 4000);
     return () => clearTimeout(timeout);
   }, [notice]);
+
+  useEffect(() => {
+    if (!Object.keys(arrivals).length) return;
+    const timeout = setTimeout(() => setArrivals({}), 3200);
+    return () => clearTimeout(timeout);
+  }, [arrivals]);
 
   const login = (event) => {
     event.preventDefault();
@@ -417,7 +430,7 @@ export default function App() {
         {role === 'viewer' ? <button className="button secondary-button disclosure-button" aria-expanded={filtersOpen} aria-controls="result-filters" onClick={() => setFiltersOpen(value => !value)}><SlidersHorizontal size={17} />フィルター{(archive || resultCarNumber) && <span className="filter-indicator" aria-label="絞り込み中" />}<ChevronDown size={16} /></button> : <button className="button secondary-button disclosure-button" aria-label="計測ログの表示切替" aria-expanded={logsOpen} aria-controls="results-content" onClick={() => setLogsOpen(value => !value)}>{logsOpen ? '閉じる' : '表示'}<ChevronDown size={18} /></button>}
         <button className="button secondary-button" disabled={!sortedResults.length || (role === 'viewer' && archive && !archive.event)} onClick={exportCSV}><Download size={17} />CSV保存</button>
       </div>
-      {role === 'viewer' && <div className="results-options"><div className="segmented-control" aria-label="結果の並び順"><button aria-pressed={sortOrder === 'time'} onClick={() => setSortOrder('time')}><Trophy size={16} />タイム順</button><button aria-pressed={sortOrder === 'latest'} onClick={() => setSortOrder('latest')}><ArrowDownUp size={16} />新着順</button><button aria-pressed={sortOrder === 'overall'} onClick={() => setSortOrder('overall')} aria-label="オーバーオールリザルト順"><Flag size={16} />オーバーオール</button></div><span className="eyebrow">TIME / MM:SS.00</span></div>}
+      {role === 'viewer' && <div className="results-options"><div className="segmented-control" aria-label="結果の並び順"><button aria-pressed={sortOrder === 'latest'} onClick={() => setSortOrder('latest')}><ArrowDownUp size={16} />新着順</button><button aria-pressed={sortOrder === 'time'} onClick={() => setSortOrder('time')}><Trophy size={16} />タイム順</button><button aria-pressed={sortOrder === 'overall'} onClick={() => setSortOrder('overall')} aria-label="オーバーオールリザルト順"><Flag size={16} />オーバーオール</button></div><span className="eyebrow">TIME / MM:SS.00</span></div>}
       </div>
       <div id="results-content" hidden={role !== 'viewer' && !logsOpen}>
       {role === 'viewer' && <>
@@ -429,9 +442,9 @@ export default function App() {
       </>}
       {role === 'viewer' && archive && !archive.event ? <div className="archive-status" role="status"><p>{archive.error || '過去の記録を読み込んでいます…'}</p>{archive.error && <button className="button secondary-button" disabled={!connected} onClick={() => selectArchive(archive.id)}>再試行</button>}</div> : !sortedResults.length ? <EmptyState icon={Trophy} title={resultCarNumber && role === 'viewer' ? 'この車両の計測結果はありません' : 'まだ計測結果はありません'} description="フィニッシュした車両のタイムがここに表示されます。" /> : (
         <ol className={`result-list ${ranked ? 'ranked-results' : ''}`}>{sortedResults.map((result, index) => (
-          <li className={`result-row ${ranked && index === 0 ? 'leader' : ''}`} key={result.id}>
+          <li className={`result-row ${ranked && index === 0 ? 'leader' : ''} ${role === 'viewer' && !archive && arrivals[result.id] ? `arrival-${arrivals[result.id]}` : ''}`} key={result.id} data-arrival={role === 'viewer' && !archive ? arrivals[result.id] : undefined}>
             {ranked && <span className="position">{String(index + 1).padStart(2, '0')}</span>}
-            <div className="result-identity"><div className="result-car"><span className="result-number">#{result.carNumber}</span><strong title={result.vehicleName}>{result.vehicleName}</strong><span className="result-date">{new Date(result.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} フィニッシュ</span></div>{role === 'viewer' && <div className="result-badges">{sortOrder !== 'overall' && result.timeMs === bestByCar.get(result.carNumber)?.timeMs && <span className="personal-best-badge" title="このカーナンバーのベストタイム" aria-label="パーソナルベスト">PB</span>}{result.id === latest?.id && <NewResultBadge key={result.id} timestamp={result.timestamp} />}</div>}</div>
+            <div className="result-identity"><div className="result-car"><span className="result-number">#{result.carNumber}</span><strong title={result.vehicleName}>{result.vehicleName}</strong><span className="result-date">{new Date(result.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} フィニッシュ</span></div>{role === 'viewer' && <div className="result-badges">{result.id === latest?.id && <NewResultBadge key={result.id} timestamp={result.timestamp} />}{sortOrder !== 'overall' && result.timeMs === bestByCar.get(result.carNumber)?.timeMs && <span className="personal-best-badge" title="このカーナンバーのベストタイム" aria-label="パーソナルベスト">PB</span>}</div>}</div>
             <div className="result-time"><strong>{formatTime(result.timeMs)}</strong>{ranked && <span className={index === 0 ? 'best-label' : 'time-gap'}>{index === 0 ? 'BEST TIME' : `+${formatTime(result.timeMs - fastest)}`}</span>}</div>
           </li>
         ))}</ol>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resultFilename, resultCSVRows, resultCarOptions, selectResults, summarizeResults } from '../src/result-utils.js';
+import { classifyArrivals, resultFilename, resultCSVRows, resultCarOptions, selectResults, summarizeResults } from '../src/result-utils.js';
 
 const rows = [
   { id: 'a', carNumber: '100', vehicleName: 'Old name', timeMs: 61000, timestamp: 100 },
@@ -9,6 +9,16 @@ const rows = [
   { id: 'd', carNumber: '100', vehicleName: 'Car 100', timeMs: 60000, timestamp: 400 },
   { id: 'e', carNumber: '2', vehicleName: 'Car 2', timeMs: 65000, timestamp: 500 },
 ];
+test('arrival emphasis distinguishes normal, strict personal and overall improvements', () => {
+  const normal = { id: 'normal', carNumber: '100', timeMs: 62000, timestamp: 600 };
+  const personal = { id: 'personal', carNumber: '100', timeMs: 59000, timestamp: 700 };
+  const global = { id: 'global', carNumber: '100', timeMs: 54000, timestamp: 800 };
+  assert.deepEqual(classifyArrivals(rows, [global, personal, normal, ...rows]), { normal: 'normal', personal: 'personal', global: 'global' });
+  assert.deepEqual(classifyArrivals(rows, rows), {});
+  assert.deepEqual(classifyArrivals([], [normal]), { normal: 'normal' });
+  assert.deepEqual(classifyArrivals(rows, [{ ...personal, timeMs: 60000 }, ...rows]), { personal: 'normal' });
+  assert.deepEqual(classifyArrivals(rows, [{ ...global, carNumber: '999' }, ...rows]), { global: 'global' });
+});
 test('overall selects one best run per car, using newest on an equal time', () => {
   assert.deepEqual(selectResults(rows, 'overall').map(r => r.id), ['b', 'd']);
   assert.deepEqual(selectResults(rows, 'overall', '100').map(r => r.id), ['d']);

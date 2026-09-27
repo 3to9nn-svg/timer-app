@@ -32,6 +32,21 @@ export function summarizeResults(results) {
   return { bestByCar, latest };
 }
 
+export function classifyArrivals(previous, next) {
+  const known = new Set(previous.map(result => result.id));
+  const best = new Map([...summarizeResults(previous).bestByCar].map(([car, result]) => [car, result.timeMs]));
+  let overall = previous.length ? Math.min(...previous.map(result => result.timeMs)) : null;
+  const arrivals = {};
+  for (const result of [...next].reverse().filter(result => !known.has(result.id)).sort((a, b) => a.timestamp - b.timestamp)) {
+    const personal = best.get(result.carNumber);
+    arrivals[result.id] = overall !== null && result.timeMs < overall ? 'global'
+      : personal !== undefined && result.timeMs < personal ? 'personal' : 'normal';
+    best.set(result.carNumber, Math.min(personal ?? Infinity, result.timeMs));
+    overall = Math.min(overall ?? Infinity, result.timeMs);
+  }
+  return arrivals;
+}
+
 export function selectResults(results, sortOrder, carNumber = '') {
   const source = sortOrder === 'overall' ? [...summarizeResults(results).bestByCar.values()] : results;
   return source.filter(result => !carNumber || result.carNumber === carNumber).sort((a, b) => sortOrder === 'latest'
