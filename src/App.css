@@ -34,6 +34,30 @@
 .page-heading .page-help p { margin: 0; max-width: 640px; }
 .disclosure-button { flex-shrink: 0; }
 .filter-indicator { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); }
+.stage-management { margin-top: 24px; }
+.stage-management-body, .stage-editor, .stage-order-settings { display: grid; gap: 14px; }
+.stage-management-body { padding: 20px; }
+.stage-name-form { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.stage-name-form label { flex-basis: 100%; }
+.stage-name-form input { flex: 1; min-width: 180px; }
+.stage-order-settings label, .stage-select { display: grid; gap: 8px; font-size: 13px; }
+.stage-select { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.timing-stage-select { background: var(--panel); margin-bottom: 16px; border: 1px solid var(--line); }
+.viewer-mode.total-mode .timing-content { grid-template-columns: minmax(0, 1fr); }
+.total-table-scroll { overflow-x: auto; padding: 0 16px 16px; }
+.total-table-scroll:focus-visible { outline: 2px solid var(--orange); }
+.total-results table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.total-results th, .total-results td { padding: 14px; border-bottom: 1px solid var(--line); text-align: left; }
+.total-results thead th { color: var(--muted); min-width: 130px; overflow-wrap: anywhere; }
+.total-results td { white-space: nowrap; font-family: var(--mono); }
+.total-results th:first-child { min-width: 50px; }
+.total-results tbody th { min-width: 140px; max-width: 260px; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .stage-management { margin-top: 12px; }
+  .stage-management-body { padding: 12px; }
+  .stage-select { padding: 10px 12px; }
+  .total-results th, .total-results td { padding: 10px; font-size: 12px; }
+}
 .entry-sort { display: grid; gap: 5px; font-size: 11px; color: var(--muted); max-width: 180px; }
 .entry-sort select { min-height: 44px; padding: 8px; font-size: 14px; }
 .admin-body, .rally-order-body { display: grid; gap: 18px; padding: 24px; }

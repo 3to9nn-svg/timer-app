@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, LockKeyhole, Trash2 } from 'lucide-react';
 import { resultFilename } from './result-utils';
+import { eventStages } from './stage-utils';
 
 function saveEventCSV(event) {
+  const stages = eventStages(event);
   const time = ms => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}.${String(Math.floor(ms / 10) % 100).padStart(2, '0')}`;
-  const rows = [['イベント', '種別', '日時', 'カーナンバー', '車両名', 'タイム'],
-    ...event.entries.map(car => [event.name, 'エントリー', '', car.carNumber, car.vehicleName, '']),
-    ...event.results.map(run => [event.name, 'リザルト', new Date(run.timestamp).toLocaleString('ja-JP'), run.carNumber, run.vehicleName, time(run.timeMs)])];
+  const rows = [['イベント', '種別', '日時', 'カーナンバー', '車両名', 'タイム', 'SS'],
+    ...event.entries.map(car => [event.name, 'エントリー', '', car.carNumber, car.vehicleName, '', '']),
+    ...event.results.map(run => [event.name, 'リザルト', new Date(run.timestamp).toLocaleString('ja-JP'), run.carNumber, run.vehicleName, time(run.timeMs), stages.find(stage => stage.id === (run.stageId || stages[0]?.id))?.name || 'SS1'])];
   const csv = '\uFEFF' + rows.map(row => row.map(value => {
     let text = String(value);
     if (/^[\s]*[=+@-]/.test(text)) text = `'${text}`;

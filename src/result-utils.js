@@ -1,4 +1,4 @@
-export function resultFilename(event, sortOrder = 'latest') {
+export function resultFilename(event, sortOrder = 'latest', stageName) {
   const name = (event?.name || 'イベント').replace(/[<>:"/\\|?*\p{Cc}]/gu, '_').replace(/[. ]+$/g, '') || 'イベント';
   let ended = '開催中';
   if (event?.endedAt != null && Number.isFinite(new Date(event.endedAt).getTime())) {
@@ -9,8 +9,9 @@ export function resultFilename(event, sortOrder = 'latest') {
     const part = type => parts.find(item => item.type === type).value;
     ended = `${part('year')}-${part('month')}-${part('day')}_${part('hour')}-${part('minute')}-${part('second')}`;
   } else if (event?.status === 'ended') ended = '終了日時未設定';
-  const selection = { time: 'Time', latest: 'history', overall: 'Overall' }[sortOrder] || 'history';
-  return `Result_${name}_${ended}_${selection}.csv`;
+  const selection = { time: 'Time', latest: 'history', overall: 'Overall', total: 'Total' }[sortOrder] || 'history';
+  const stage = stageName ? `_${stageName.replace(/[<>:"/\\|?*\p{Cc}]/gu, '_').replace(/[. ]+$/g, '')}` : '';
+  return `Result_${name}_${ended}${stage}_${selection}.csv`;
 }
 
 export function resultCSVRows(event, results, sortOrder) {
